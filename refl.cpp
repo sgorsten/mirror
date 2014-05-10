@@ -7,8 +7,8 @@ std::ostream & operator << (std::ostream & out, const VarType & vt)
     if(vt.isVolatile) out << " volatile";
     switch(vt.indirection)
     {
-    case VarType::LValueRef: out << " &";
-    case VarType::RValueRef: out << " &&";
+    case VarType::LValueRef: out << " &"; break;
+    case VarType::RValueRef: out << " &&"; break;
     }
     return out;
 }

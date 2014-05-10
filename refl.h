@@ -18,9 +18,8 @@ struct VarType
     Indirection                         indirection;    
 
                                         VarType()                   : type(typeid(void)), isConst(), isVolatile(), indirection() {}
-    template<class T>                   VarType(std::tuple<T> *)    : type(typeid(T)), isConst(std::is_const<T>::value), isVolatile(std::is_volatile<T>::value), indirection(std::is_lvalue_reference<T>::value ? LValueRef : std::is_lvalue_reference<T>::value ? RValueRef : None) {}
 
-    template<class T> static VarType    Get()                       { return VarType((std::tuple<T> *)nullptr); }
+    template<class T> static VarType    Get()                       { VarType t; t.indirection = std::is_lvalue_reference<T>::value ? LValueRef : std::is_lvalue_reference<T>::value ? RValueRef : None; typedef std::remove_reference_t<T> U; t.isConst = std::is_const<U>::value; t.isVolatile = std::is_volatile<U>::value; t.type = typeid(std::remove_cv_t<U>); return t; }
 };
 std::ostream & operator << (std::ostream & out, const VarType & vt);
 
@@ -36,11 +35,11 @@ struct Function
     template<class F> static Function   Bind(F func, std::string name) { auto f = Bind(func); f.name = move(name); return f; }
 private:
     // Bind accepts pointers to free functions and member functions, deduces the call signature, and passes the results to BindWithSignature
-    template<         class R, class... P> static Function Bind(R (   *func)(P...)               ) { return BindWithSignature( func,                                                                              (R(*)(                    P...))nullptr); }
-    template<class C, class R, class... P> static Function Bind(R (C::*func)(P...)               ) { return BindWithSignature([func](               C & c, P... p) { return c.*func(std::forward<P...>(p...)); }, (R(*)(               C &, P...))nullptr); }
-    template<class C, class R, class... P> static Function Bind(R (C::*func)(P...) const         ) { return BindWithSignature([func](const          C & c, P... p) { return c.*func(std::forward<P...>(p...)); }, (R(*)(const          C &, P...))nullptr); }
-    template<class C, class R, class... P> static Function Bind(R (C::*func)(P...)       volatile) { return BindWithSignature([func](      volatile C & c, P... p) { return c.*func(std::forward<P...>(p...)); }, (R(*)(      volatile C &, P...))nullptr); }
-    template<class C, class R, class... P> static Function Bind(R (C::*func)(P...) const volatile) { return BindWithSignature([func](const volatile C & c, P... p) { return c.*func(std::forward<P...>(p...)); }, (R(*)(const volatile C &, P...))nullptr); }
+    template<         class R, class... P> static Function Bind(R (   *func)(P...)               ) { return BindWithSignature( func,                                                                             (R(*)(                    P...))nullptr); }
+    template<class C, class R, class... P> static Function Bind(R (C::*func)(P...)               ) { return BindWithSignature([func](               C & c, P... p) { return (c.*func)(std::forward<P>(p)...); }, (R(*)(               C &, P...))nullptr); }
+    template<class C, class R, class... P> static Function Bind(R (C::*func)(P...) const         ) { return BindWithSignature([func](const          C & c, P... p) { return (c.*func)(std::forward<P>(p)...); }, (R(*)(const          C &, P...))nullptr); }
+    template<class C, class R, class... P> static Function Bind(R (C::*func)(P...)       volatile) { return BindWithSignature([func](      volatile C & c, P... p) { return (c.*func)(std::forward<P>(p)...); }, (R(*)(      volatile C &, P...))nullptr); }
+    template<class C, class R, class... P> static Function Bind(R (C::*func)(P...) const volatile) { return BindWithSignature([func](const volatile C & c, P... p) { return (c.*func)(std::forward<P>(p)...); }, (R(*)(const volatile C &, P...))nullptr); }
 
     // BindWithSignature accepts a function option and a call signature, and creates a Function instance, with both metadata and an implementation which invokes CallWithArgs
     template<class F, class R, class... P> static Function BindWithSignature(F func, R   (*)(P...)) { Function f; f.result = VarType::Get<R   >(); f.InitParameterList((std::tuple<P...> *)nullptr); f.impl = [func](void * args[]) { return std::make_shared<R>(CallWithArgs(func, args, (R(*)(P...))nullptr)); }; return f; }
