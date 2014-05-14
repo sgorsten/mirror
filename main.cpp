@@ -40,19 +40,19 @@ int main()
     Character player(100, 20, 0.5f), enemy(30, 10, 1.0f);
 
     auto prog = std::make_shared<const Program>(2, std::vector<Line>{
-        {Function::Bind(types, &Character::GetDamagePerSecond,"getDps"), {-1}},
-        {Function::Bind(types, &Print<float>,"print"), {0}},
-        {Function::Bind(types, &Character::AttackCharacter,"attack"), {-1, -2}},
-        {Function::Bind(types, &Character::AttackCharacter,"attack"), {-1, -2}},
-        {Function::Bind(types, &Character::IsAlive,"isAlive"), {-2}},
-        {Function::Bind(types, &Print<bool>,"print"), {4}},
-        {Function::Bind(types, &Character::DropGold,"dropGold"), {-2}},
-        {Function::Bind(types, &Character::GiveGold,"giveGold"), {-1,6}},
-        {Function::Bind(types, &Character::GetGold,"getGold"), {-1}},
-        {Function::Bind(types, &Print<int>,"print"), {8}},
-        {Function::Bind(types, &Character::GiveGold,"giveGold"), {-1,6}}, // Gold was already passed by move to this function, so it will be empty
-        {Function::Bind(types, &Character::GetGold,"getGold"), {-1}},
-        {Function::Bind(types, &Print<int>,"print"), {11}}, // Should see same result (100) as above
+        {types.BindFunction(&Character::GetDamagePerSecond,"getDps"), {-1}},
+        {types.BindFunction(&Print<float>,"print"), {0}},
+        {types.BindFunction(&Character::AttackCharacter,"attack"), {-1, -2}},
+        {types.BindFunction(&Character::AttackCharacter,"attack"), {-1, -2}},
+        {types.BindFunction(&Character::IsAlive,"isAlive"), {-2}},
+        {types.BindFunction(&Print<bool>,"print"), {4}},
+        {types.BindFunction(&Character::DropGold,"dropGold"), {-2}},
+        {types.BindFunction(&Character::GiveGold,"giveGold"), {-1,6}},
+        {types.BindFunction(&Character::GetGold,"getGold"), {-1}},
+        {types.BindFunction(&Print<int>,"print"), {8}},
+        {types.BindFunction(&Character::GiveGold,"giveGold"), {-1,6}}, // Gold was already passed by move to this function, so it will be empty
+        {types.BindFunction(&Character::GetGold,"getGold"), {-1}},
+        {types.BindFunction(&Print<int>,"print"), {11}}, // Should see same result (100) as above
     });
     std::cout << *prog << std::endl;
     
