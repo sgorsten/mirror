@@ -21,6 +21,27 @@ size_t GetStringWidth(const std::string & text)
     return w;
 }
 
+void WriteValue(std::ostream & out, const Type & type, void * value)
+{
+    switch(type.kind)
+    {
+    case Type::Fundamental:
+        if(type.index == typeid(int)) out << *(int *)value;
+        else out << "???";
+        break;
+    default:
+        out << "???";
+        break;
+    }
+}
+
+std::string ToStr(const Type & type, void * value)
+{
+    std::ostringstream ss;
+    WriteValue(ss, type, value);
+    return ss.str();
+}
+
 struct Node
 {
     int                     x,y;
@@ -48,9 +69,9 @@ struct Node
     size_t                  GetSizeY() const { return std::max<size_t>({GetInputColumnSize(), GetContentsColumnSize(), GetOutputColumnSize()}); }
 
     size_t                  GetInputColumnLabelWidth() const { if(!function) return 0; size_t w=0; for(auto & p : function->GetParamTypes()) w = std::max(w, GetStringWidth(ToString() << p)); return w; }
-    size_t                  GetContentsColumnWidth() const { return std::max(function ? GetStringWidth(function->GetName()) : 0, size_t(200)); }
+    size_t                  GetContentsColumnWidth() const { return std::max(function ? GetStringWidth(function->GetName()) : 0, GetStringWidth(ToStr(*type.type, value.get()))); }
     size_t                  GetOutputColumnLabelWidth() const { return GetStringWidth(ToString() << type); }
-    size_t                  GetSizeX() const { return GetInputColumnLabelWidth() + GetContentsColumnWidth() + GetOutputColumnLabelWidth() + GetColumnPadding() * 2; }
+    size_t                  GetSizeX() const { return GetPinSpacing() * 2 + GetInputColumnLabelWidth() + GetContentsColumnWidth() + GetOutputColumnLabelWidth() + GetColumnPadding() * 2; }
 
     Rect                    GetNodeRect() const { return {x,y,x+GetSizeX(),y+GetSizeY()}; }
     Rect                    GetPinRect(int x, int y) const { return {x,y,x+GetPinSize(),y+GetPinSize()}; }
@@ -100,11 +121,8 @@ void OnDisplay()
             rect.y0 += n.GetPinSpacing();
         }
        
-        if(n.type.type->index == typeid(int))
-        {
-            glColor3f(0.7f,0.7f,0.7f);
-            RenderText(rect.x0, rect.y0, ToString() << *(const int *)n.value.get());
-        }
+        glColor3f(0.7f,0.7f,0.7f);
+        RenderText(rect.x0, rect.y0, ToStr(*n.type.type, n.value.get()));
 
         for(size_t i=0; i<n.GetInputCount(); ++i)
         {
