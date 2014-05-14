@@ -1,4 +1,5 @@
 #include "refl.h"
+#include "graph.h"
 
 #include <iostream>
 
