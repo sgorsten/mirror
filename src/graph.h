@@ -5,7 +5,7 @@
 
 struct Line
 {
-    Function func;
+    const Function * func;
     std::vector<int> args;
 };
 std::ostream & operator << (std::ostream & out, const Line & line);
@@ -39,7 +39,7 @@ public:
             {
                 callArgs[i] = line.args[i] < 0 ? args[-line.args[i]-1] : results[line.args[i]].get();
             }
-            results.push_back(line.func.Invoke(callArgs));
+            results.push_back(line.func->Invoke(callArgs));
         }
     }
 

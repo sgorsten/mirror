@@ -37,23 +37,34 @@ template<class T> void Print(const T & value) { std::cout << value << std::endl;
 int main()
 {
     TypeLibrary types;
+    types.BindFunction(&Print<int>,"printi");
+    types.BindFunction(&Print<bool>,"printb");
+    types.BindFunction(&Print<float>,"printf");
+    types.BindFunction(&Character::IsAlive,"isAlive");
+    types.BindFunction(&Character::GetDamagePerSecond,"getDps");
+    types.BindFunction(&Character::GetGold,"getGold");
+    types.BindFunction(&Character::AttackCharacter,"attack");
+    types.BindFunction(&Character::DropGold,"dropGold");
+    types.BindFunction(&Character::GiveGold,"giveGold");    
+
+
 
     Character player(100, 20, 0.5f), enemy(30, 10, 1.0f);
-
+  
     auto prog = std::make_shared<const Program>(2, std::vector<Line>{
-        {types.BindFunction(&Character::GetDamagePerSecond,"getDps"), {-1}},
-        {types.BindFunction(&Print<float>,"print"), {0}},
-        {types.BindFunction(&Character::AttackCharacter,"attack"), {-1, -2}},
-        {types.BindFunction(&Character::AttackCharacter,"attack"), {-1, -2}},
-        {types.BindFunction(&Character::IsAlive,"isAlive"), {-2}},
-        {types.BindFunction(&Print<bool>,"print"), {4}},
-        {types.BindFunction(&Character::DropGold,"dropGold"), {-2}},
-        {types.BindFunction(&Character::GiveGold,"giveGold"), {-1,6}},
-        {types.BindFunction(&Character::GetGold,"getGold"), {-1}},
-        {types.BindFunction(&Print<int>,"print"), {8}},
-        {types.BindFunction(&Character::GiveGold,"giveGold"), {-1,6}}, // Gold was already passed by move to this function, so it will be empty
-        {types.BindFunction(&Character::GetGold,"getGold"), {-1}},
-        {types.BindFunction(&Print<int>,"print"), {11}}, // Should see same result (100) as above
+        {types.GetFunction("getDps"), {-1}},
+        {types.GetFunction("printf"), {0}},
+        {types.GetFunction("attack"), {-1, -2}},
+        {types.GetFunction("attack"), {-1, -2}},
+        {types.GetFunction("isAlive"), {-2}},
+        {types.GetFunction("printb"), {4}},
+        {types.GetFunction("dropGold"), {-2}},
+        {types.GetFunction("giveGold"), {-1,6}},
+        {types.GetFunction("getGold"), {-1}},
+        {types.GetFunction("printi"), {8}},
+        {types.GetFunction("giveGold"), {-1,6}}, // Gold was already passed by move to this function, so it will be empty
+        {types.GetFunction("getGold"), {-1}},
+        {types.GetFunction("printi"), {11}}, // Should see same result (100) as above
     });
     std::cout << *prog << std::endl;
     

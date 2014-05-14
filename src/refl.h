@@ -8,6 +8,7 @@
 #include <typeindex>
 #include <string>
 #include <ostream>
+#include <list>
 #include <map>
 
 struct Type;
@@ -59,15 +60,21 @@ public:
 class TypeLibrary
 {
 public:
-    template<class F> Function          BindFunction(F func, std::string name)      { return Bind(move(name), func); }
+    const std::vector<Function> &       GetAllFunctions() const                     { return functions; }
+    const Function *                    GetFunction(const char * name) const        { for(auto & f : functions) if(f.GetName() == name) return &f; return nullptr; }
+    const Type *                        GetType(std::type_index index) const        { auto it = types.find(index); return it != end(types) ? &it->second : nullptr; }
+
+    template<class F> void              BindFunction(F func, std::string name)      { functions.push_back(Bind(move(name), func)); }
     template<class T> const Type &      DeduceType()                                { auto & type = types[typeid(T)]; if(type.kind == Type::None) { type.index = typeid(T); type.size = SizeOf<T>::VALUE; type.isTrivial = std::is_trivial<T>::value; InitType(type, (T*)nullptr); assert(type.kind != Type::None); } return type; }
     template<class T> VarType           DeduceVarType()                             { typedef std::remove_reference_t<T> U; return { &DeduceType<std::remove_cv_t<U>>(), std::is_const<U>::value, std::is_volatile<U>::value, std::is_lvalue_reference<T>::value ? VarType::LValueRef : std::is_lvalue_reference<T>::value ? VarType::RValueRef : VarType::None }; }
 
 private: // IMPLEMENTATION DETAILS
-    template<class T> struct                    SizeOf                                                  { enum { VALUE = sizeof(T) }; };
-    template<> struct                           SizeOf<void>                                            { enum { VALUE = 0 }; }; // Void does not occupy space (but void pointers do!)
-    template<class R, class... P> struct        SizeOf<R(P...)>                                         { enum { VALUE = 0 }; }; // Functions do not occupy space (but function pointers do!)
-    std::map<std::type_index, Type>             types;
+    std::map<std::type_index, Type>     types;
+    std::vector<Function>               functions;
+
+    template<class T> struct                SizeOf                                                  { enum { VALUE = sizeof(T) }; };
+    template<> struct                       SizeOf<void>                                            { enum { VALUE = 0 }; }; // Void does not occupy space (but void pointers do!)
+    template<class R, class... P> struct    SizeOf<R(P...)>                                         { enum { VALUE = 0 }; }; // Functions do not occupy space (but function pointers do!)
 
     // These functions initialize an instance of Type by deducing the structure of a C/C++ type. They can handle fundamentals, structs/classes, unions, arrays, functions, and pointers to data or functions, members or free.
     template<class T                     > void InitType(Type & type, T      *                      )   { type.kind = std::is_fundamental<T>::value ? Type::Fundamental : std::is_class<T>::value ? Type::Class : std::is_union<T>::value ? Type::Union : std::is_enum<T>::value ? Type::Enum : Type::None; }
