@@ -68,25 +68,33 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <OutDir>$(SolutionDir)..\bin\$(Platform)</OutDir>
-    <IntDir>$(SolutionDir)..\obj\$(ProjectName)\$(Configuration)$(Platform)</IntDir>
+    <OutDir>$(SolutionDir)..\bin\$(Platform)\</OutDir>
+    <IntDir>$(SolutionDir)..\obj\$(ProjectName)\$(Configuration)$(Platform)\</IntDir>
     <TargetName>$(ProjectName)_d</TargetName>
+    <IncludePath>$(SolutionDir)..\dep\freeglut-2.8.1\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)..\dep\freeglut-2.8.1\lib\$(Platform);$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <OutDir>$(SolutionDir)..\bin\$(Platform)</OutDir>
-    <IntDir>$(SolutionDir)..\obj\$(ProjectName)\$(Configuration)$(Platform)</IntDir>
+    <OutDir>$(SolutionDir)..\bin\$(Platform)\</OutDir>
+    <IntDir>$(SolutionDir)..\obj\$(ProjectName)\$(Configuration)$(Platform)\</IntDir>
     <TargetName>$(ProjectName)_d</TargetName>
+    <IncludePath>$(SolutionDir)..\dep\freeglut-2.8.1\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)..\dep\freeglut-2.8.1\lib\$(Platform);$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>$(SolutionDir)..\bin\$(Platform)</OutDir>
-    <IntDir>$(SolutionDir)..\obj\$(ProjectName)\$(Configuration)$(Platform)</IntDir>
+    <OutDir>$(SolutionDir)..\bin\$(Platform)\</OutDir>
+    <IntDir>$(SolutionDir)..\obj\$(ProjectName)\$(Configuration)$(Platform)\</IntDir>
+    <IncludePath>$(SolutionDir)..\dep\freeglut-2.8.1\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)..\dep\freeglut-2.8.1\lib\$(Platform);$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>$(SolutionDir)..\bin\$(Platform)</OutDir>
-    <IntDir>$(SolutionDir)..\obj\$(ProjectName)\$(Configuration)$(Platform)</IntDir>
+    <OutDir>$(SolutionDir)..\bin\$(Platform)\</OutDir>
+    <IntDir>$(SolutionDir)..\obj\$(ProjectName)\$(Configuration)$(Platform)\</IntDir>
+    <IncludePath>$(SolutionDir)..\dep\freeglut-2.8.1\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)..\dep\freeglut-2.8.1\lib\$(Platform);$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

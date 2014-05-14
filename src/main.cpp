@@ -1,6 +1,8 @@
 #include "refl.h"
 #include "graph.h"
 
+#include <GL/freeglut.h>
+
 #include <iostream>
 
 class Gold
@@ -34,7 +36,35 @@ public:
 
 template<class T> void Print(const T & value) { std::cout << value << std::endl; }
 
-int main()
+void OnIdle() 
+{ 
+    glutPostRedisplay(); 
+}
+
+void RenderText(int x, int y, const std::string & text)
+{
+    glRasterPos2i(x,y);
+    for(auto ch : text) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, ch);
+}
+
+void OnDisplay()
+{  
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glOrtho(0, 1280, 720, 0, -1, 1);
+
+    RenderText(640, 360, "This is a test");
+
+    glPopMatrix();   
+    glPopAttrib();
+
+    glutSwapBuffers();
+}
+
+int main(int argc, char * argv[])
 {
     TypeLibrary types;
     types.BindFunction(&Print<int>,"printi");
@@ -71,6 +101,19 @@ int main()
     const auto ev = Event<Character &, Character &>(prog);
 
     ev(player,enemy);
+
+    glutInit(&argc, argv);
+    glutInitWindowSize(1280, 720);
+    glutInitDisplayMode(GLUT_RGBA|GLUT_DOUBLE|GLUT_DEPTH);
+    glutCreateWindow("libmirror call graph visualizer");
+
+    glutIdleFunc(OnIdle);
+    glutDisplayFunc(OnDisplay);
+    //glutReshapeFunc(OnReshape);
+    //glutMotionFunc(OnMotion);
+    //glutMouseFunc(OnMouse);
+    //glutKeyboardFunc(OnKeyboard);
+    glutMainLoop();
 
     return 0;
 }
