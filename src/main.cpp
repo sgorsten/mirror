@@ -1,40 +1,17 @@
 #include "refl.h"
-#include "graph.h"
 
 #include <GL/freeglut.h>
+#include <sstream>
 
-#include <iostream>
-
-class Gold
+struct Node
 {
-    int gold;
-public:
-    Gold(int gold) : gold(gold) {}
-    Gold(Gold && r) : gold(r.gold) { r.gold = 0; }
-    int GetAmount() const { return gold; }
+    int                     x,y;
+    const Function *        function; // If non-null, this is a function node
+    std::vector<size_t>     inputs;
+    VarType                 type;
+    std::shared_ptr<void>   value;
 };
-
-class Character
-{
-    int     hitPoints;
-    int     attackDamage;
-    float   attackTime;
-    float   cooldown;
-    int     gold;
-public:
-    Character(int hitPoints, int attackDamage, float attackTime) : hitPoints(hitPoints), attackDamage(attackDamage), attackTime(attackTime), cooldown(), gold(50) {}
-
-    bool IsAlive() const { return hitPoints > 0; }
-    float GetDamagePerSecond() const { return attackDamage / attackTime; }
-    void AttackCharacter(Character & target) { target.TakeDamage(attackDamage); cooldown += attackTime; }
-    void TakeDamage(int damage) { hitPoints -= damage; }
-
-    Gold DropGold() { int g = gold; gold = 0; return Gold(g); }
-    void GiveGold(Gold g) { gold += g.GetAmount(); }
-    int GetGold() const { return gold; }
-};
-
-template<class T> void Print(const T & value) { std::cout << value << std::endl; }
+std::vector<Node> nodes;
 
 void OnIdle() 
 { 
@@ -56,51 +33,90 @@ void OnDisplay()
     glPushMatrix();
     glOrtho(0, 1280, 720, 0, -1, 1);
 
-    RenderText(640, 360, "This is a test");
+    for(const auto & n : nodes)
+    {
+        std::ostringstream ss;
+        if(n.function) ss << *n.function;
+        else ss << n.type;
+        ss << ": ";
+        if(n.type.type->index == typeid(int)) ss << *(const int *)n.value.get();
+        RenderText(n.x, n.y, ss.str());
 
+        for(size_t i=0; i<n.inputs.size(); ++i)
+        {
+            ss.str("");
+            ss << n.function->GetParamTypes()[i];
+            RenderText(n.x, n.y + (i+1)*16, ss.str());
+            glBegin(GL_LINES);
+            glVertex2i(n.x, n.y + (i+1)*16);
+            glVertex2i(nodes[n.inputs[i]].x, nodes[n.inputs[i]].y);
+            glEnd();
+        }
+    }
+   
     glPopMatrix();   
     glPopAttrib();
 
     glutSwapBuffers();
 }
 
+int add(int a, int b) { return a+b; }
+int mul(int a, int b) { return a*b; }
+
 int main(int argc, char * argv[])
 {
     TypeLibrary types;
-    types.BindFunction(&Print<int>,"printi");
-    types.BindFunction(&Print<bool>,"printb");
-    types.BindFunction(&Print<float>,"printf");
-    types.BindFunction(&Character::IsAlive,"isAlive");
-    types.BindFunction(&Character::GetDamagePerSecond,"getDps");
-    types.BindFunction(&Character::GetGold,"getGold");
-    types.BindFunction(&Character::AttackCharacter,"attack");
-    types.BindFunction(&Character::DropGold,"dropGold");
-    types.BindFunction(&Character::GiveGold,"giveGold");    
+    types.BindFunction(&add,"add");
+    types.BindFunction(&mul,"mul");
 
+    nodes.resize(5);
 
+    nodes[0].x = 100;
+    nodes[0].y = 100;
+    nodes[0].function = nullptr;
+    nodes[0].type = types.DeduceVarType<int>();
+    nodes[0].value = std::make_shared<int>(2);
 
-    Character player(100, 20, 0.5f), enemy(30, 10, 1.0f);
-  
-    auto prog = std::make_shared<const Program>(2, std::vector<Line>{
-        {types.GetFunction("getDps"), {-1}},
-        {types.GetFunction("printf"), {0}},
-        {types.GetFunction("attack"), {-1, -2}},
-        {types.GetFunction("attack"), {-1, -2}},
-        {types.GetFunction("isAlive"), {-2}},
-        {types.GetFunction("printb"), {4}},
-        {types.GetFunction("dropGold"), {-2}},
-        {types.GetFunction("giveGold"), {-1,6}},
-        {types.GetFunction("getGold"), {-1}},
-        {types.GetFunction("printi"), {8}},
-        {types.GetFunction("giveGold"), {-1,6}}, // Gold was already passed by move to this function, so it will be empty
-        {types.GetFunction("getGold"), {-1}},
-        {types.GetFunction("printi"), {11}}, // Should see same result (100) as above
-    });
-    std::cout << *prog << std::endl;
-    
-    const auto ev = Event<Character &, Character &>(prog);
+    nodes[1].x = 100;
+    nodes[1].y = 300;
+    nodes[1].function = nullptr;
+    nodes[1].type = types.DeduceVarType<int>();
+    nodes[1].value = std::make_shared<int>(3);
 
-    ev(player,enemy);
+    nodes[2].x = 500;
+    nodes[2].y = 200;
+    nodes[2].function = types.GetFunction("add");
+    nodes[2].inputs = {0,1};
+    nodes[2].type = {};
+    nodes[2].value = nullptr;
+
+    nodes[3].x = 500;
+    nodes[3].y = 400;
+    nodes[3].function = nullptr;
+    nodes[3].type = types.DeduceVarType<int>();
+    nodes[3].value = std::make_shared<int>(8);
+
+    nodes[4].x = 900;
+    nodes[4].y = 300;
+    nodes[4].function = types.GetFunction("mul");
+    nodes[4].inputs = {2,3};
+    nodes[4].type = {};
+    nodes[4].value = nullptr;
+
+    // Evaluate call graph
+    void * args[8];
+    for(auto & n : nodes)
+    {
+        if(n.function)
+        {
+            for(size_t i=0; i<n.inputs.size(); ++i)
+            {
+                args[i] = nodes[n.inputs[i]].value.get();
+            }
+            n.value = n.function->Invoke(args);
+            n.type = n.function->GetReturnType();
+        }    
+    }
 
     glutInit(&argc, argv);
     glutInitWindowSize(1280, 720);

@@ -48,7 +48,7 @@ class Function
     const Type *                        type;
     FunctionImpl                        impl;
 public:
-                                        Function(std::string name, const Type & type, FunctionImpl impl)    : name(move(name)), type(&type), impl(move(impl)) { assert(type->kind == Type::Function); }
+                                        Function(std::string name, const Type & type, FunctionImpl impl)    : name(move(name)), type(&type), impl(move(impl)) { assert(type.kind == Type::Function); }
 
     const std::string &                 GetName() const                                                     { return name; }
     const Type &                        GetType() const                                                     { return *type; }
