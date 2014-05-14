@@ -8,48 +8,80 @@
 #include <typeindex>
 #include <string>
 #include <ostream>
+#include <map>
+
+struct Type;
 
 struct VarType
 {
     enum                                Indirection                 { None, LValueRef, RValueRef };
-    std::type_index                     type;
+    const Type *                        type;
     bool                                isConst;
     bool                                isVolatile;
-    Indirection                         indirection;    
-
-                                        VarType()                   : type(typeid(void)), isConst(), isVolatile(), indirection() {}
-
-    template<class T> static VarType    Get()                       { VarType t; t.indirection = std::is_lvalue_reference<T>::value ? LValueRef : std::is_lvalue_reference<T>::value ? RValueRef : None; typedef std::remove_reference_t<T> U; t.isConst = std::is_const<U>::value; t.isVolatile = std::is_volatile<U>::value; t.type = typeid(std::remove_cv_t<U>); return t; }
+    Indirection                         indirection;
 };
 std::ostream & operator << (std::ostream & out, const VarType & vt);
+
+struct Type
+{
+    enum Kind                           { None, Other, Array, Pointer, FieldPointer, FunctionPointer, MethodPointer, Function };
+
+    std::type_index                     type;
+    size_t                              size;
+    Kind                                kind;
+    std::type_index                     elemType,objType;
+    std::vector<VarType>                paramTypes;
+    VarType                             returnType;
+
+                                        Type()                      : type(typeid(void)), size(), kind(None), elemType(type), objType(type) {}
+};
+
+class TypeLibrary
+{
+    template<class T> struct                    SizeOf                      { enum { VALUE = sizeof(T) }; };
+    template<> struct                           SizeOf<void>                { enum { VALUE = 0 }; }; // Void does not occupy space (but void pointers do!)
+    template<class R, class... P> struct        SizeOf<R(P...)>             { enum { VALUE = 0 }; }; // Functions do not occupy space (but function pointers do!)
+    std::map<std::type_index, Type>             types;
+
+    template<class T                     > void InitType(Type & type, T      *                      ) { type.kind = Type::Other;                                                                                                        }
+    template<class E, int N              > void InitType(Type & type, E     (*)[N]                  ) { type.kind = Type::Array;           type.elemType = &DeduceType<E>();                                                            }
+    template<class E                     > void InitType(Type & type, E     **                      ) { type.kind = Type::Pointer;         type.elemType = &DeduceType<E>();                                                            }
+    template<class E, class C            > void InitType(Type & type, E  C::**                      ) { type.kind = Type::FieldPointer;    type.elemType = &DeduceType<E>();                           type.objType = &DeduceType<C>(); }
+    template<class R,          class... P> void InitType(Type & type, R    (**)(P...)               ) { type.kind = Type::FunctionPointer; type.elemType = &DeduceType<R(                    P...)>();                                  }
+    template<class R, class C, class... P> void InitType(Type & type, R (C::**)(P...)               ) { type.kind = Type::MethodPointer;   type.elemType = &DeduceType<R(const          C &, P...)>(); type.objType = &DeduceType<C>(); }
+    template<class R, class C, class... P> void InitType(Type & type, R (C::**)(P...) const         ) { type.kind = Type::MethodPointer;   type.elemType = &DeduceType<R(      volatile C &, P...)>(); type.objType = &DeduceType<C>(); }
+    template<class R, class C, class... P> void InitType(Type & type, R (C::**)(P...)       volatile) { type.kind = Type::MethodPointer;   type.elemType = &DeduceType<R(const volatile C &, P...)>(); type.objType = &DeduceType<C>(); }
+    template<class R, class C, class... P> void InitType(Type & type, R (C::**)(P...) const volatile) { type.kind = Type::MethodPointer;   type.elemType = &DeduceType<R(               C &, P...)>(); type.objType = &DeduceType<C>(); }
+    template<class R,          class... P> void InitType(Type & type, R     (*)(P...)               ) { type.kind = Type::Function; type.returnType = DeduceVarType<R>(); InitParameterList(type, (std::tuple<P...> *)nullptr); }
+    template<         class T, class... P> void InitParameterList(Type & type, std::tuple<T,P...> * ) { type.paramTypes.push_back(DeduceVarType<T>()); InitParameterList(type, (std::tuple<P...> *)nullptr); }
+                                           void InitParameterList(Type & type, std::tuple<      > * ) {}
+public:
+    template<class T> const Type &      DeduceType()                { auto & type = types[typeid(T)]; if(type.kind == Type::None) { type.type = typeid(T); type.size = SizeOf<T>::VALUE; InitType(type, (T*)nullptr); } return type; }
+    template<class T> VarType           DeduceVarType()             { typedef std::remove_reference_t<T> U; return { &DeduceType<std::remove_cv_t<U>>(), std::is_const<U>::value, std::is_volatile<U>::value, std::is_lvalue_reference<T>::value ? VarType::LValueRef : std::is_lvalue_reference<T>::value ? VarType::RValueRef : VarType::None }; }
+};
 
 struct Function
 {
     std::function<std::shared_ptr<void>(void **)> impl;
-    std::vector<VarType>                params;
-    VarType                             result;
+    const Type *                        type;
     std::string                         name;
 
     std::shared_ptr<void>               Invoke(void * args[]) const { return impl(args); }
 
-    template<class F> static Function   Bind(F func, std::string name) { auto f = Bind(func); f.name = move(name); return f; }
+    template<class F> static Function   Bind(TypeLibrary & types, F func, std::string name) { auto f = Bind(types, func); f.name = move(name); return f; }
 private:
     // Bind accepts pointers to free functions and member functions, deduces the call signature, and passes the results to BindWithSignature
-    template<         class R, class... P> static Function Bind(R (   *func)(P...)               ) { return BindWithSignature( func,                                                                             (R(*)(                    P...))nullptr); }
-    template<class C, class R, class... P> static Function Bind(R (C::*func)(P...)               ) { return BindWithSignature([func](               C & c, P... p) { return (c.*func)(std::forward<P>(p)...); }, (R(*)(               C &, P...))nullptr); }
-    template<class C, class R, class... P> static Function Bind(R (C::*func)(P...) const         ) { return BindWithSignature([func](const          C & c, P... p) { return (c.*func)(std::forward<P>(p)...); }, (R(*)(const          C &, P...))nullptr); }
-    template<class C, class R, class... P> static Function Bind(R (C::*func)(P...)       volatile) { return BindWithSignature([func](      volatile C & c, P... p) { return (c.*func)(std::forward<P>(p)...); }, (R(*)(      volatile C &, P...))nullptr); }
-    template<class C, class R, class... P> static Function Bind(R (C::*func)(P...) const volatile) { return BindWithSignature([func](const volatile C & c, P... p) { return (c.*func)(std::forward<P>(p)...); }, (R(*)(const volatile C &, P...))nullptr); }
+    template<         class R, class... P> static Function Bind(TypeLibrary & types, R (   *func)(P...)               ) { return BindWithSignature(types,  func,                                                                             (R(*)(                    P...))nullptr); }
+    template<class C, class R, class... P> static Function Bind(TypeLibrary & types, R (C::*func)(P...)               ) { return BindWithSignature(types, [func](               C & c, P... p) { return (c.*func)(std::forward<P>(p)...); }, (R(*)(               C &, P...))nullptr); }
+    template<class C, class R, class... P> static Function Bind(TypeLibrary & types, R (C::*func)(P...) const         ) { return BindWithSignature(types, [func](const          C & c, P... p) { return (c.*func)(std::forward<P>(p)...); }, (R(*)(const          C &, P...))nullptr); }
+    template<class C, class R, class... P> static Function Bind(TypeLibrary & types, R (C::*func)(P...)       volatile) { return BindWithSignature(types, [func](      volatile C & c, P... p) { return (c.*func)(std::forward<P>(p)...); }, (R(*)(      volatile C &, P...))nullptr); }
+    template<class C, class R, class... P> static Function Bind(TypeLibrary & types, R (C::*func)(P...) const volatile) { return BindWithSignature(types, [func](const volatile C & c, P... p) { return (c.*func)(std::forward<P>(p)...); }, (R(*)(const volatile C &, P...))nullptr); }
 
     // BindWithSignature accepts a function option and a call signature, and creates a Function instance, with both metadata and an implementation which invokes CallWithArgs
-    template<class F, class R, class... P> static Function BindWithSignature(F func, R   (*)(P...)) { Function f; f.result = VarType::Get<R   >(); f.InitParameterList((std::tuple<P...> *)nullptr); f.impl = [func](void * args[]) { return std::make_shared<R>(CallWithArgs(func, args, (R(*)(P...))nullptr)); }; return f; }
-    template<class F, class R, class... P> static Function BindWithSignature(F func, R & (*)(P...)) { Function f; f.result = VarType::Get<R & >(); f.InitParameterList((std::tuple<P...> *)nullptr); f.impl = [func](void * args[]) { return std::shared_ptr<void>(&CallWithArgs(func, args, (R & (*)(P...))nullptr)); }; return f; }
-    template<class F, class R, class... P> static Function BindWithSignature(F func, R &&(*)(P...)) { Function f; f.result = VarType::Get<R &&>(); f.InitParameterList((std::tuple<P...> *)nullptr); f.impl = [func](void * args[]) { return std::shared_ptr<void>(&CallWithArgs(func, args, (R &&(*)(P...))nullptr)); }; return f; }
-    template<class F,          class... P> static Function BindWithSignature(F func, void(*)(P...)) { Function f; f.result = VarType::Get<void>(); f.InitParameterList((std::tuple<P...> *)nullptr); f.impl = [func](void * args[]) { CallWithArgs(func, args, (void(*)(P...))nullptr); return std::shared_ptr<void>(); }; return f; }
-
-    // InitParameterList fills out the function parameter list from a list of parameter types
-    template<class P, class... PS> void InitParameterList(std::tuple<P,PS...> *) { params.push_back(VarType::Get<P>()); InitParameterList((std::tuple<PS...> *)nullptr); }
-                                   void InitParameterList(std::tuple<       > *) {}
+    template<class F, class R, class... P> static Function BindWithSignature(TypeLibrary & types, F func, R   (*)(P...)) { Function f; f.type = &types.DeduceType<R   (P...)>(); f.impl = [func](void * args[]) { return std::make_shared<R>(CallWithArgs(func, args, (R(*)(P...))nullptr)); }; return f; }
+    template<class F, class R, class... P> static Function BindWithSignature(TypeLibrary & types, F func, R & (*)(P...)) { Function f; f.type = &types.DeduceType<R & (P...)>(); f.impl = [func](void * args[]) { return std::shared_ptr<void>(&CallWithArgs(func, args, (R & (*)(P...))nullptr)); }; return f; }
+    template<class F, class R, class... P> static Function BindWithSignature(TypeLibrary & types, F func, R &&(*)(P...)) { Function f; f.type = &types.DeduceType<R &&(P...)>(); f.impl = [func](void * args[]) { return std::shared_ptr<void>(&CallWithArgs(func, args, (R &&(*)(P...))nullptr)); }; return f; }
+    template<class F,          class... P> static Function BindWithSignature(TypeLibrary & types, F func, void(*)(P...)) { Function f; f.type = &types.DeduceType<void(P...)>(); f.impl = [func](void * args[]) { CallWithArgs(func, args, (void(*)(P...))nullptr); return std::shared_ptr<void>(); }; return f; }
 
     // CallWithArgs invokes a function object with a list of arguments provided as an array of void pointers. It calls PassByArg to convert each argument pointer to the correct parameter type.
     template<class F, class R                                    > static R CallWithArgs(F func, void * args[], R(*)(       )) { return func(                                                                                  ); }
@@ -65,6 +97,10 @@ private:
     template<class T> static T    PassArg(void * addr, std::tuple<T   > *) { return T(std::move(*reinterpret_cast<T *>(addr))); } // For value types, move-construct a new value from the original
 };
 std::ostream & operator << (std::ostream & out, const Function & f);
+
+
+
+
 
 struct Line
 {

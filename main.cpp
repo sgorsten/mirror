@@ -35,22 +35,24 @@ template<class T> void Print(const T & value) { std::cout << value << std::endl;
 
 int main()
 {
+    TypeLibrary types;
+
     Character player(100, 20, 0.5f), enemy(30, 10, 1.0f);
 
     auto prog = std::make_shared<const Program>(2, std::vector<Line>{
-        {Function::Bind(&Character::GetDamagePerSecond,"getDps"), {-1}},
-        {Function::Bind(&Print<float>,"print"), {0}},
-        {Function::Bind(&Character::AttackCharacter,"attack"), {-1, -2}},
-        {Function::Bind(&Character::AttackCharacter,"attack"), {-1, -2}},
-        {Function::Bind(&Character::IsAlive,"isAlive"), {-2}},
-        {Function::Bind(&Print<bool>,"print"), {4}},
-        {Function::Bind(&Character::DropGold,"dropGold"), {-2}},
-        {Function::Bind(&Character::GiveGold,"giveGold"), {-1,6}},
-        {Function::Bind(&Character::GetGold,"getGold"), {-1}},
-        {Function::Bind(&Print<int>,"print"), {8}},
-        {Function::Bind(&Character::GiveGold,"giveGold"), {-1,6}}, // Gold was already passed by move to this function, so it will be empty
-        {Function::Bind(&Character::GetGold,"getGold"), {-1}},
-        {Function::Bind(&Print<int>,"print"), {11}}, // Should see same result (100) as above
+        {Function::Bind(types, &Character::GetDamagePerSecond,"getDps"), {-1}},
+        {Function::Bind(types, &Print<float>,"print"), {0}},
+        {Function::Bind(types, &Character::AttackCharacter,"attack"), {-1, -2}},
+        {Function::Bind(types, &Character::AttackCharacter,"attack"), {-1, -2}},
+        {Function::Bind(types, &Character::IsAlive,"isAlive"), {-2}},
+        {Function::Bind(types, &Print<bool>,"print"), {4}},
+        {Function::Bind(types, &Character::DropGold,"dropGold"), {-2}},
+        {Function::Bind(types, &Character::GiveGold,"giveGold"), {-1,6}},
+        {Function::Bind(types, &Character::GetGold,"getGold"), {-1}},
+        {Function::Bind(types, &Print<int>,"print"), {8}},
+        {Function::Bind(types, &Character::GiveGold,"giveGold"), {-1,6}}, // Gold was already passed by move to this function, so it will be empty
+        {Function::Bind(types, &Character::GetGold,"getGold"), {-1}},
+        {Function::Bind(types, &Print<int>,"print"), {11}}, // Should see same result (100) as above
     });
     std::cout << *prog << std::endl;
     
