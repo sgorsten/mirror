@@ -157,11 +157,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\graph.cpp" />
     <ClCompile Include="..\src\main.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\src\graph.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="mirror.vcxproj">
