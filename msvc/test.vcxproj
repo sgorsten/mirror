@@ -71,7 +71,7 @@
     <OutDir>$(SolutionDir)..\bin\$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)..\obj\$(ProjectName)\$(Configuration)$(Platform)\</IntDir>
     <TargetName>$(ProjectName)_d</TargetName>
-    <IncludePath>$(SolutionDir)..\dep\freeglut-2.8.1\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)..\include;$(SolutionDir)..\dep\freeglut-2.8.1\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\dep\freeglut-2.8.1\lib\$(Platform);$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -79,21 +79,21 @@
     <OutDir>$(SolutionDir)..\bin\$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)..\obj\$(ProjectName)\$(Configuration)$(Platform)\</IntDir>
     <TargetName>$(ProjectName)_d</TargetName>
-    <IncludePath>$(SolutionDir)..\dep\freeglut-2.8.1\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)..\include;$(SolutionDir)..\dep\freeglut-2.8.1\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\dep\freeglut-2.8.1\lib\$(Platform);$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)..\bin\$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)..\obj\$(ProjectName)\$(Configuration)$(Platform)\</IntDir>
-    <IncludePath>$(SolutionDir)..\dep\freeglut-2.8.1\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)..\include;$(SolutionDir)..\dep\freeglut-2.8.1\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\dep\freeglut-2.8.1\lib\$(Platform);$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)..\bin\$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)..\obj\$(ProjectName)\$(Configuration)$(Platform)\</IntDir>
-    <IncludePath>$(SolutionDir)..\dep\freeglut-2.8.1\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)..\include;$(SolutionDir)..\dep\freeglut-2.8.1\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\dep\freeglut-2.8.1\lib\$(Platform);$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -157,12 +157,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\main.cpp" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="mirror.vcxproj">
       <Project>{5c7d2ed1-6589-490f-85c8-3c55fcfb884d}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\samples\graph.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\samples\graph.cpp" />
+    <ClCompile Include="..\samples\main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
