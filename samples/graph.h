@@ -16,7 +16,8 @@ public:
     template<class T> ToString & operator << (const T & val) { ss << val; return *this; }
 };
 
-size_t GetStringWidth(const std::string & text);
+int GetStringWidth12(const std::string & text);
+int GetStringWidth18(const std::string & text);
 
 void WriteValue(std::ostream & out, const Type & type, void * value);
 std::string ToStr(const Type & type, void * value);
@@ -30,43 +31,45 @@ struct Node
     std::shared_ptr<void>   value;
 
                             Node() : x(), y(), function() {}
-                            Node(int x, int y, const Function * function) : x(x), y(y), function(function), inputs(GetInputCount(),-1), type(function->GetReturnType()) {}
+                            Node(int x, int y, const Function * function)       : x(x), y(y), function(function), inputs(GetInputCount(),-1), type(function->GetReturnType()) {}
     template<class T>       Node(int x, int y, TypeLibrary & types, T && value) : x(x), y(y), function(), type(types.DeduceVarType<T>()), value(std::make_shared<T>(std::move(value))) {}
 
-    size_t                  GetInputCount() const { return function ? function->GetParamTypes().size() : 0; }
-    size_t                  GetOutputCount() const { return 1; }
+    int                     GetInputCount() const                               { return function ? (int)function->GetParamTypes().size() : 0; }
+    int                     GetOutputCount() const                              { return 1; }
 
-    size_t                  GetPinSize() const { return 22; }
-    size_t                  GetPinPadding() const { return 2; }
-    size_t                  GetColumnPadding() const { return 10; }
+    int                     GetPinSize() const                                  { return 16; }
+    int                     GetPinPadding() const                               { return 2; }
+    int                     GetColumnPadding() const                            { return 10; }
+    int                     GetLineSize() const                                 { return 22; }
+    int                     GetLinePadding() const                              { return 2; }
 
-    size_t                  GetPinSpacing() const { return GetPinSize() + GetPinPadding(); }
-    size_t                  GetPinColumnSize(size_t pins) const { return pins>0 ? (GetPinSize() + GetPinSpacing()*(pins-1)) : 0; }
-    size_t                  GetInputColumnSize() const { return GetPinColumnSize(GetInputCount()); }
-    size_t                  GetContentsColumnSize() const { return GetPinColumnSize(function ? 2 : 1); }
-    size_t                  GetOutputColumnSize() const { return GetPinColumnSize(GetOutputCount()); }
-    size_t                  GetSizeY() const { return std::max<size_t>({GetInputColumnSize(), GetContentsColumnSize(), GetOutputColumnSize()}); }
+    int                     GetPinSpacing() const                               { return GetPinSize() + GetPinPadding(); }
+    int                     GetLineSpacing() const                               { return GetLineSize() + GetLinePadding(); }
+    int                     GetPinColumnSize(int pins) const                    { return pins>0 ? (GetPinSize() + GetPinSpacing()*(pins-1)) : 0; }
+    int                     GetLineColumnSize(int pins) const                    { return pins>0 ? (GetLineSize() + GetLineSpacing()*(pins-1)) : 0; }
+    int                     GetInputColumnSize() const                          { return GetPinColumnSize(GetInputCount()); }
+    int                     GetContentsColumnSize() const                       { return GetLineColumnSize(function ? 2 : 1); }
+    int                     GetOutputColumnSize() const                         { return GetPinColumnSize(GetOutputCount()); }
+    int                     GetSizeY() const                                    { return std::max<int>({GetInputColumnSize(), GetContentsColumnSize(), GetOutputColumnSize()}); }
 
-    size_t                  GetInputColumnLabelWidth() const { if(!function) return 0; size_t w=0; for(auto & p : function->GetParamTypes()) w = std::max(w, GetStringWidth(ToString() << p)); return w; }
-    size_t                  GetContentsColumnWidth() const { return std::max(function ? GetStringWidth(function->GetName()) : 0, GetStringWidth(ToStr(*type.type, value.get()))); }
-    size_t                  GetOutputColumnLabelWidth() const { return GetStringWidth(ToString() << type); }
-    size_t                  GetSizeX() const { return GetPinSpacing() * 2 + GetInputColumnLabelWidth() + GetContentsColumnWidth() + GetOutputColumnLabelWidth() + GetColumnPadding() * 2; }
+    int                     GetInputColumnLabelWidth() const                    { if(!function) return 0; int w=0; for(auto & p : function->GetParamTypes()) w = std::max(w, GetStringWidth12(ToString() << p)); return w; }
+    int                     GetContentsColumnWidth() const                      { return std::max(function ? GetStringWidth18(function->GetName()) : 0, GetStringWidth18(ToStr(*type.type, value.get()))); }
+    int                     GetOutputColumnLabelWidth() const                   { return GetStringWidth12(ToString() << type); }
+    int                     GetSizeX() const                                    { return GetPinSpacing() * 2 + GetInputColumnLabelWidth() + GetContentsColumnWidth() + GetOutputColumnLabelWidth() + GetColumnPadding() * 2; }
 
-    Rect                    GetNodeRect() const { return {x,y,x+GetSizeX(),y+GetSizeY()}; }
-    Rect                    GetPinRect(int x, int y) const { return {x,y,x+GetPinSize(),y+GetPinSize()}; }
-    Rect                    GetInputPinRect(size_t i) const { return GetPinRect(x, y + (GetSizeY()-GetInputColumnSize())/2 + i*GetPinSpacing()); }
-    Rect                    GetOutputPinRect(size_t i) const { return GetPinRect(x+GetSizeX()-GetPinSize(), y + (GetSizeY()-GetOutputColumnSize())/2 + i*GetPinSpacing()); }
-    Rect                    GetContentsRect() const { auto x0 = x+GetPinSize()+GetInputColumnLabelWidth()+GetColumnPadding(); return {x0, y, x0+GetContentsColumnWidth(), y+GetSizeY()}; }
+    Rect                    GetNodeRect() const                                 { return {x,y,x+GetSizeX(),y+GetSizeY()}; }
+    Rect                    GetPinRect(int x, int y) const                      { return {x,y,x+GetPinSize(),y+GetPinSize()}; }
+    Rect                    GetInputPinRect(size_t i) const                     { return GetPinRect(x, y + (GetSizeY()-GetInputColumnSize())/2 + i*GetPinSpacing()); }
+    Rect                    GetOutputPinRect(size_t i) const                    { return GetPinRect(x+GetSizeX()-GetPinSize(), y + (GetSizeY()-GetOutputColumnSize())/2 + i*GetPinSpacing()); }
+    Rect                    GetContentsRect() const                             { auto x0 = x+GetPinSize()+GetInputColumnLabelWidth()+GetColumnPadding(); return {x0, y, x0+GetContentsColumnWidth(), y+GetSizeY()}; }
 };
 
 struct Feature
 {
-    enum                    Type        { None, Body, Input, Output };
+    enum                    Type                                                { None, Body, Input, Output };
     Type                    type;       
     Node *                  node;
     size_t                  pin;
-
-                            Feature()   : type(None), node(), pin() {}
 };
 
 struct GraphEditor
@@ -77,12 +80,12 @@ struct GraphEditor
     Feature mouseOverFeature;
     Feature clickedFeature;
 
-    GraphEditor() {}
+    GraphEditor() : mouseOverFeature(Feature{}), clickedFeature({}) {}
 
     void ConnectPins(Feature a, Feature b);
 
     void RecomputeNode(Node & n);
-    void SetMousePosition(int x, int y);
+    Feature GetFeature(int x, int y);
 };
 
 #endif

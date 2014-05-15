@@ -2,10 +2,12 @@
 
 void WriteValue(std::ostream & out, const Type & type, void * value)
 {
+    if(!value) return;
     switch(type.kind)
     {
     case Type::Fundamental:
         if(type.index == typeid(int)) out << *(int *)value;
+        else if(type.index == typeid(float)) out << *(float *)value;
         else out << "???";
         break;
     default:
@@ -24,7 +26,14 @@ std::string ToStr(const Type & type, void * value)
 void GraphEditor::ConnectPins(Feature a, Feature b)
 {
     if(b.type == Feature::Input) std::swap(a, b);
-    if(a.type == Feature::Input && b.type == Feature::Output) a.node->inputs[a.pin] = b.node - nodes.data();
+    if(a.type == Feature::Input && b.type == Feature::Output)
+    {
+        auto paramType = a.node->function->GetParamTypes()[a.pin];
+        auto argType = b.node->type;
+        if(paramType.type != argType.type) return;
+
+        a.node->inputs[a.pin] = b.node - nodes.data();
+    }
 }
 
 void GraphEditor::RecomputeNode(Node & n)
@@ -43,7 +52,7 @@ void GraphEditor::RecomputeNode(Node & n)
     }   
 }
 
-void GraphEditor::SetMousePosition(int x, int y)
+Feature GraphEditor::GetFeature(int x, int y)
 {
     for(auto & n : nodes)
     {
@@ -57,9 +66,7 @@ void GraphEditor::SetMousePosition(int x, int y)
                 rect = n.GetInputPinRect(i);
                 if(x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1)
                 {
-                    mouseOverFeature.type = Feature::Input;
-                    mouseOverFeature.pin = i;                    
-                    return;
+                    return {Feature::Input, &n, i};
                 }
             }
 
@@ -68,16 +75,13 @@ void GraphEditor::SetMousePosition(int x, int y)
                 rect = n.GetOutputPinRect(i);
                 if(x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1)
                 {
-                    mouseOverFeature.type = Feature::Output;
-                    mouseOverFeature.pin = i;                    
-                    return;
+                    return {Feature::Output, &n, i};
                 }
             }
 
-            mouseOverFeature.type = Feature::Body;
-            return;
+            return {Feature::Body, &n};
         }
     }
 
-    mouseOverFeature.type = Feature::None;
+    return {Feature::None};
 }
