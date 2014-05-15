@@ -80,10 +80,100 @@ struct Node
     Rect                    GetContentsRect() const { auto x0 = x+GetPinSize()+GetInputColumnLabelWidth()+GetColumnPadding(); return {x0, y, x0+GetContentsColumnWidth(), y+GetSizeY()}; }
 };
 std::vector<Node> nodes;
+Node * clickedNode;
+int lastX, lastY;
+int clickedInput;
+
+void RecomputeNode(Node & n)
+{
+    if(n.function)
+    {
+        void * args[8];
+        for(size_t i=0; i<n.inputs.size(); ++i)
+        {
+            if(n.inputs[i] < 0) return;
+            if(!nodes[n.inputs[i]].value) return;
+            args[i] = nodes[n.inputs[i]].value.get();
+        }
+        n.value = n.function->Invoke(args);
+        n.type = n.function->GetReturnType();
+    }   
+}
 
 void OnIdle() 
 { 
     glutPostRedisplay(); 
+}
+
+void OnMotion(int x, int y)
+{
+    if(clickedNode)
+    {
+        if(clickedInput == -1)
+        {
+            clickedNode->x += x - lastX;
+            clickedNode->y += y - lastY;
+        }
+        lastX = x;
+        lastY = y;
+    }
+}
+
+void OnMouse(int button, int state, int x, int y)
+{
+    if(button == GLUT_LEFT_BUTTON)
+    {
+        if(state == GLUT_DOWN)
+        {
+            lastX = x;
+            lastY = y;
+            for(auto & n : nodes)
+            {
+                auto rect = n.GetNodeRect();
+                if(x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1)
+                {
+                    clickedNode = &n;
+                    for(size_t i=0; i<n.inputs.size(); ++i)
+                    {
+                        rect = n.GetInputPinRect(i);
+                        if(x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1)
+                        {
+                            clickedInput = i;
+                            clickedNode->inputs[i] = -1;
+                            return;
+                        }
+                    }
+                    clickedInput = -1;
+                    return;
+                }
+            }
+        }
+        if(clickedNode && clickedInput != -1 && state == GLUT_UP)
+        {
+            for(auto & n : nodes)
+            {
+                auto rect = n.GetNodeRect();
+                if(x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1)
+                {
+                    clickedNode->inputs[clickedInput] = &n - nodes.data();
+                    clickedNode = nullptr;
+                    return;
+                }
+            }       
+        }
+        clickedNode = nullptr;
+    }
+    if(button == GLUT_RIGHT_BUTTON)
+    {
+        for(auto & n : nodes)
+        {
+            auto rect = n.GetNodeRect();
+            if(x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1)
+            {
+                RecomputeNode(n);
+            }
+        }
+    }
 }
 
 void RenderText(int x, int y, const std::string & text)
@@ -172,8 +262,14 @@ void OnDisplay()
             }
         }
     }
+    if(clickedNode && clickedInput != -1)
+    {
+        auto a = clickedNode->GetInputPinRect(clickedInput);
+        glVertex2f((a.x0+a.x1)*0.5f, (a.y0+a.y1)*0.5f);
+        glVertex2i(lastX, lastY);
+    }
     glEnd();
-   
+
     glPopMatrix();   
     glPopAttrib();
 
@@ -204,18 +300,7 @@ int main(int argc, char * argv[])
 
     // Evaluate call graph
     void * args[8];
-    for(auto & n : nodes)
-    {
-        if(n.function)
-        {
-            for(size_t i=0; i<n.inputs.size(); ++i)
-            {
-                args[i] = nodes[n.inputs[i]].value.get();
-            }
-            n.value = n.function->Invoke(args);
-            n.type = n.function->GetReturnType();
-        }    
-    }
+    for(auto & n : nodes) RecomputeNode(n);
 
     glutInit(&argc, argv);
     glutInitWindowSize(1280, 720);
@@ -225,8 +310,8 @@ int main(int argc, char * argv[])
     glutIdleFunc(OnIdle);
     glutDisplayFunc(OnDisplay);
     //glutReshapeFunc(OnReshape);
-    //glutMotionFunc(OnMotion);
-    //glutMouseFunc(OnMouse);
+    glutMotionFunc(OnMotion);
+    glutMouseFunc(OnMouse);
     //glutKeyboardFunc(OnKeyboard);
     glutMainLoop();
 
