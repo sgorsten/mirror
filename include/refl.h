@@ -24,7 +24,7 @@ struct VarType
 
 struct Type
 {
-    enum Kind                           { None, Fundamental, Class, Union, Enum, Array, Pointer, Function };
+    enum                                Kind                        { None, Fundamental, Class, Union, Enum, Array, Pointer, Function };
 
     std::type_index                     index;
     size_t                              size;

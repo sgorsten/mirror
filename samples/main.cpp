@@ -102,21 +102,22 @@ void OnDisplay()
         glEnd();
 
         rect = n.GetContentsRect();
-        if(n.function)
+
+        std::ostringstream ss;
+        n.nodeType->WriteLabel(ss);
+        auto label = ss.str();
+        if(!label.empty())
         {
             glColor3f(1,1,1);
-            RenderText18(rect.x0, rect.y0, ToString() << n.function->GetName());
+            RenderText18(rect.x0, rect.y0, ss.str());
             rect.y0 += n.GetLineSpacing();
         }
-       
-        glColor3f(0.7f,0.7f,0.7f);
-        RenderText18(rect.x0, rect.y0, ToStr(*n.type.type, n.value.get()));
 
         for(size_t i=0; i<n.GetInputCount(); ++i)
         {
             rect = n.GetInputPinRect(i);
             glBegin(GL_QUADS);
-            if(editor.clickedFeature.type == Feature::Output && editor.clickedFeature.node->type.type == n.function->GetParamTypes()[i].type) glColor3f(1,1,0);
+            if(editor.clickedFeature.type == Feature::Output && editor.clickedFeature.GetPinType().type == n.GetInputType(i).type) glColor3f(1,1,0);
             else glColor3f(0.5f,0.5f,0.5f);
             glVertex2i(rect.x0,rect.y0);
             glVertex2i(rect.x1,rect.y0);
@@ -125,14 +126,14 @@ void OnDisplay()
             glEnd();
 
             glColor3f(1,1,1);
-            RenderText12(rect.x1 + n.GetPinPadding(), rect.y0, ToString() << n.function->GetParamTypes()[i]);
+            RenderText12(rect.x1 + n.GetPinPadding(), rect.y0, ToString() << n.nodeType->GetInputType(i));
         }
 
         for(size_t i=0; i<n.GetOutputCount(); ++i)
         {
             rect = n.GetOutputPinRect(i);
             glBegin(GL_QUADS);
-            if(editor.clickedFeature.type == Feature::Input && editor.clickedFeature.node->function->GetParamTypes()[editor.clickedFeature.pin].type == n.type.type) glColor3f(1,1,0);
+            if(editor.clickedFeature.type == Feature::Input && editor.clickedFeature.GetPinType().type == n.GetOutputType(i).type) glColor3f(1,1,0);
             else glColor3f(0.5f,0.5f,0.5f);
             glVertex2i(rect.x0,rect.y0);
             glVertex2i(rect.x1,rect.y0);
@@ -140,7 +141,10 @@ void OnDisplay()
             glVertex2i(rect.x0,rect.y1);
             glEnd();
 
-            std::string s = ToString() << n.type;
+            std::ostringstream ss;
+            if(n.outputValues[i]) { WriteValue(ss, *n.GetOutputType(i).type, n.outputValues[i].get()); ss << " : "; }
+            ss << n.nodeType->GetOutputType(i);
+            std::string s = ss.str();
             glColor3f(1,1,1);
             RenderText12(rect.x0 - n.GetPinPadding() - GetStringWidth12(s), rect.y0, s);
         }
@@ -164,7 +168,7 @@ void OnDisplay()
     }
     if(editor.clickedFeature.type == Feature::Input)
     {
-        if(editor.mouseOverFeature.type == Feature::Output && editor.mouseOverFeature.node->type.type == editor.clickedFeature.node->function->GetParamTypes()[editor.clickedFeature.pin].type) glColor3f(1,1,0);
+        if(editor.mouseOverFeature.type == Feature::Output && editor.mouseOverFeature.GetPinType().type == editor.clickedFeature.GetPinType().type) glColor3f(1,1,0);
         else glColor3f(0.5f,0.5f,0.5f);
 
         auto a = editor.clickedFeature.node->GetInputPinRect(editor.clickedFeature.pin);
@@ -173,7 +177,7 @@ void OnDisplay()
     }
     if(editor.clickedFeature.type == Feature::Output)
     {
-        if(editor.mouseOverFeature.type == Feature::Input && editor.clickedFeature.node->type.type == editor.mouseOverFeature.node->function->GetParamTypes()[editor.mouseOverFeature.pin].type) glColor3f(1,1,0);
+        if(editor.mouseOverFeature.type == Feature::Input && editor.clickedFeature.GetPinType().type == editor.mouseOverFeature.GetPinType().type) glColor3f(1,1,0);
         else glColor3f(0.5f,0.5f,0.5f);
 
         auto a = editor.clickedFeature.node->GetOutputPinRect(editor.clickedFeature.pin);

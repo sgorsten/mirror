@@ -28,8 +28,8 @@ void GraphEditor::ConnectPins(Feature a, Feature b)
     if(b.type == Feature::Input) std::swap(a, b);
     if(a.type == Feature::Input && b.type == Feature::Output)
     {
-        auto paramType = a.node->function->GetParamTypes()[a.pin];
-        auto argType = b.node->type;
+        auto paramType = a.node->GetInputType(a.pin);
+        auto argType = b.node->GetOutputType(b.pin);
         if(paramType.type != argType.type) return;
 
         a.node->inputs[a.pin] = b.node - nodes.data();
@@ -37,19 +37,15 @@ void GraphEditor::ConnectPins(Feature a, Feature b)
 }
 
 void GraphEditor::RecomputeNode(Node & n)
-{
-    if(n.function)
+{  
+    void * args[8];
+    for(size_t i=0; i<n.inputs.size(); ++i)
     {
-        void * args[8];
-        for(size_t i=0; i<n.inputs.size(); ++i)
-        {
-            if(n.inputs[i] < 0) return;
-            if(!nodes[n.inputs[i]].value) return;
-            args[i] = nodes[n.inputs[i]].value.get();
-        }
-        n.value = n.function->Invoke(args);
-        n.type = n.function->GetReturnType();
-    }   
+        if(n.inputs[i] < 0) return;
+        if(!nodes[n.inputs[i]].outputValues[0]) return;
+        args[i] = nodes[n.inputs[i]].outputValues[0].get();
+    }
+    n.outputValues = n.nodeType->Evaluate(args);
 }
 
 Feature GraphEditor::GetFeature(int x, int y)
