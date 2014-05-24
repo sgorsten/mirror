@@ -235,19 +235,19 @@ struct Character
 int main(int argc, char * argv[])
 {
     TypeLibrary types;
-    types.BindFunction("neg", &neg, {});
-    types.BindFunction("add", &add, {"a","b"});
-    types.BindFunction("mul", &mul, {"a","b"});
-    types.BindFunction("negf", &negf, {});
-    types.BindFunction("addf", &addf, {"a","b"});
-    types.BindFunction("mulf", &mulf, {"a","b"});
+    types.BindFunction(&neg,  "neg", {});
+    types.BindFunction(&add,  "add", {"a","b"});
+    types.BindFunction(&mul,  "mul", {"a","b"});
+    types.BindFunction(&negf, "negf", {});
+    types.BindFunction(&addf, "addf", {"a","b"});
+    types.BindFunction(&mulf, "mulf", {"a","b"});
     types.BindClass<Character>("Character")
-        .HasField("x", &Character::x)
-        .HasField("y", &Character::y)
-        .HasField("hp", &Character::hp)
-        .HasMethod("move", &Character::move, {"dx","dy"})
-        .HasMethod("damage", &Character::damage, {"dmg"})
-        .HasMethod("heal", &Character::heal, {"hp"})
+        .HasField(&Character::x,  "x")
+        .HasField(&Character::y,  "y")
+        .HasField(&Character::hp, "hp")
+        .HasMethod(&Character::move,   "move",   {"dx","dy"})
+        .HasMethod(&Character::damage, "damage", {"dmg"})
+        .HasMethod(&Character::heal,   "heal",   {"hp"})
         .HasConstructor<int>({"hp"});
 
     editor.nodes.push_back(Node(100, 100, types, Character()));
