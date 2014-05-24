@@ -46,9 +46,9 @@ std::ostream & operator << (std::ostream & out, const Type & type)
     {
     default: assert(false); return out;
     case Type::Fundamental: return out << type.index.name();
-    case Type::Class: return out << type.index.name();
-    case Type::Union: return out << type.index.name();
-    case Type::Enum: return out << type.index.name();
+    case Type::Class: return out << (type.className.empty() ? type.index.name() : type.className.c_str());
+    case Type::Union: return out << (type.className.empty() ? type.index.name() : type.className.c_str());
+    case Type::Enum: return out << (type.className.empty() ? type.index.name() : type.className.c_str());
     case Type::Array:
         {
             std::vector<size_t> dims;

@@ -27,9 +27,10 @@ struct INodeType
     virtual void WriteLabel(std::ostream & out) const = 0;
     virtual size_t GetInputCount() const = 0;
     virtual size_t GetOutputCount() const = 0;
-    virtual std::string GetInputLabel(size_t index) const = 0;
     virtual VarType GetInputType(size_t index) const = 0;
     virtual VarType GetOutputType(size_t index) const = 0;
+    virtual std::string GetInputLabel(size_t index) const = 0;
+    virtual std::string GetOutputLabel(size_t index) const = 0;
     virtual std::vector<std::shared_ptr<void>> Evaluate(void * inputs[]) const = 0;
 };
 
@@ -42,9 +43,10 @@ public:
     void                                WriteLabel(std::ostream & out) const override       { out << function.GetName(); }
     size_t                              GetInputCount() const override                      { return function.GetParamTypes().size(); }
     size_t                              GetOutputCount() const override                     { return 1; }
-    std::string                         GetInputLabel(size_t index) const override          { auto & n = function.GetParamName(index); if(!n.empty()) return n; return ToString() << GetInputType(index); }
     VarType                             GetInputType(size_t index) const override           { return function.GetParamTypes()[index]; }
     VarType                             GetOutputType(size_t index) const override          { return function.GetReturnType(); }
+    std::string                         GetInputLabel(size_t index) const override          { return function.GetParamName(index); }
+    std::string                         GetOutputLabel(size_t index) const override         { return {}; }
     std::vector<std::shared_ptr<void>>  Evaluate(void * inputs[]) const override            { return {function.Invoke(inputs)}; }
 };
 
@@ -60,6 +62,7 @@ public:
     std::string                         GetInputLabel(size_t index) const override          { assert(false); return {}; }
     VarType                             GetInputType(size_t index) const override           { assert(false); return {}; }
     VarType                             GetOutputType(size_t index) const override          { assert(index == 0); return type; }
+    std::string                         GetOutputLabel(size_t index) const override         { return {}; }
     std::vector<std::shared_ptr<void>>  Evaluate(void * inputs[]) const override            { return {nullptr}; }
 };
 
@@ -72,9 +75,10 @@ public:
     void                                WriteLabel(std::ostream & out) const override       { out << "Access"; }
     size_t                              GetInputCount() const override                      { return 1; }
     size_t                              GetOutputCount() const override                     { return type.fields.size(); }
-    std::string                         GetInputLabel(size_t index) const override          { return ToString() << GetInputType(index); }
     VarType                             GetInputType(size_t index) const override           { assert(index == 0); return {&type, false, false, VarType::LValueRef}; }
     VarType                             GetOutputType(size_t index) const override          { return type.fields[index].type; }
+    std::string                         GetInputLabel(size_t index) const override          { return {}; }
+    std::string                         GetOutputLabel(size_t index) const override         { return type.fields[index].identifier; }
     std::vector<std::shared_ptr<void>>  Evaluate(void * inputs[]) const override            { std::vector<std::shared_ptr<void>> outputs; for(auto & field : type.fields) outputs.push_back(std::shared_ptr<void>(field.accessor(inputs[0]), [](void *){})); return outputs; }
 };
 
@@ -87,9 +91,10 @@ public:
     void                                WriteLabel(std::ostream & out) const override       { out << "Construct"; }
     size_t                              GetInputCount() const override                      { return type.fields.size(); }
     size_t                              GetOutputCount() const override                     { return 1; }
-    std::string                         GetInputLabel(size_t index) const override          { return type.fields[index].identifier; }
     VarType                             GetInputType(size_t index) const override           { return type.fields[index].type; }
     VarType                             GetOutputType(size_t index) const override          { return {&type, false, false, VarType::None}; }
+    std::string                         GetInputLabel(size_t index) const override          { return type.fields[index].identifier; }
+    std::string                         GetOutputLabel(size_t index) const override         { return {}; }
     std::vector<std::shared_ptr<void>>  Evaluate(void * inputs[]) const override
                                         {
                                             auto output = type.DefConstruct();
@@ -129,6 +134,7 @@ struct Node
     int                                 GetLinePadding() const                              { return 2; }
 
     std::string                         GetInputLabel(size_t index) const                   { return nodeType->GetInputLabel(index); }
+    std::string                         GetOutputLabel(size_t index) const                  { return nodeType->GetOutputLabel(index); }
 
     int                                 GetPinSpacing() const                               { return GetPinSize() + GetPinPadding(); }
     int                                 GetLineSpacing() const                              { return GetLineSize() + GetLinePadding(); }
@@ -141,7 +147,7 @@ struct Node
 
     int                                 GetInputColumnLabelWidth() const                    { int w=0; for(size_t i=0, n=GetInputCount(); i!=n; ++i) w = std::max(w, GetStringWidth12(GetInputLabel(i))); return w; }
     int                                 GetContentsColumnWidth() const                      { std::ostringstream ss; nodeType->WriteLabel(ss); return GetStringWidth18(ss.str()); }
-    int                                 GetOutputColumnLabelWidth() const                   { int w=0; for(size_t i=0, n=GetOutputCount(); i!=n; ++i) w = std::max(w, GetStringWidth12(ToString() << ToStr(*GetOutputType(i).type, outputValues[i].get()) << " : " << GetOutputType(i))); return w; }
+    int                                 GetOutputColumnLabelWidth() const                   { int w=0; for(size_t i=0, n=GetOutputCount(); i!=n; ++i) w = std::max(w, GetStringWidth12(ToString() << ToStr(*GetOutputType(i).type, outputValues[i].get()) << " : " << GetOutputLabel(i))); return w; }
     int                                 GetSizeX() const                                    { return GetPinSpacing() * 2 + GetInputColumnLabelWidth() + GetContentsColumnWidth() + GetOutputColumnLabelWidth() + GetColumnPadding() * 2; }
 
     Rect                                GetNodeRect() const                                 { return {x,y,x+GetSizeX(),y+GetSizeY()}; }

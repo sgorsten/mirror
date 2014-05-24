@@ -143,7 +143,7 @@ void OnDisplay()
 
             std::ostringstream ss;
             if(n.outputValues[i]) { WriteValue(ss, *n.GetOutputType(i).type, n.outputValues[i].get()); ss << " : "; }
-            ss << n.GetOutputType(i);
+            ss << n.GetOutputLabel(i);
             std::string s = ss.str();
             glColor3f(1,1,1);
             RenderText12(rect.x0 - n.GetPinPadding() - GetStringWidth12(s), rect.y0, s);
@@ -187,11 +187,12 @@ void OnDisplay()
     }
     glEnd();
 
-    if(editor.mouseOverFeature.type == Feature::Input)
+    std::string mouseOverText;
+    if(editor.mouseOverFeature.IsPin())
     {
-        std::string s = ToString() << editor.mouseOverFeature.node->GetInputType(editor.mouseOverFeature.pin);
-        
-        auto w = GetStringWidth12(s);
+        std::string mouseOverText = ToString() << editor.mouseOverFeature.GetPinType();
+
+        auto w = GetStringWidth12(mouseOverText);
         glBegin(GL_QUADS);
         glColor3f(0,0,0);
         glVertex2i(editor.lastX, editor.lastY);
@@ -201,7 +202,7 @@ void OnDisplay()
         glEnd();
 
         glColor3f(1,1,1);
-        RenderText12(editor.lastX, editor.lastY-16, s);
+        RenderText12(editor.lastX, editor.lastY-16, mouseOverText);
     }
 
     glPopMatrix();   
@@ -234,24 +235,20 @@ struct Character
 int main(int argc, char * argv[])
 {
     TypeLibrary types;
-    types.BindFunction("neg", &neg);
-    types.BindFunction("add", &add);
-    types.BindFunction("mul", &mul);
-    types.BindFunction("negf", &negf);
-    types.BindFunction("addf", &addf);
-    types.BindFunction("mulf", &mulf);
+    types.BindFunction("neg", &neg, {});
+    types.BindFunction("add", &add, {"a","b"});
+    types.BindFunction("mul", &mul, {"a","b"});
+    types.BindFunction("negf", &negf, {});
+    types.BindFunction("addf", &addf, {"a","b"});
+    types.BindFunction("mulf", &mulf, {"a","b"});
     types.BindClass<Character>("Character")
         .HasField("x", &Character::x)
         .HasField("y", &Character::y)
         .HasField("hp", &Character::hp)
-        .HasMethod("move", &Character::move)
-        .HasMethod("damage", &Character::damage)
-        .HasMethod("heal", &Character::heal)
-        .HasConstructor<int>();
-    types.NameParameter("move",0,"this");
-    types.NameParameter("move",1,"dx");
-    types.NameParameter("move",2,"dy");
-    types.NameParameter("Character",0,"hp");
+        .HasMethod("move", &Character::move, {"dx","dy"})
+        .HasMethod("damage", &Character::damage, {"dmg"})
+        .HasMethod("heal", &Character::heal, {"hp"})
+        .HasConstructor<int>({"hp"});
 
     editor.nodes.push_back(Node(100, 100, types, Character()));
     editor.nodes.push_back(Node(100, 200, types, 2));
