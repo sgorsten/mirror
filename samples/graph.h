@@ -85,19 +85,16 @@ public:
     size_t                              GetOutputCount() const override                     { return 1; }
     VarType                             GetInputType(size_t index) const override           { return type.fields[index].type; }
     VarType                             GetOutputType(size_t index) const override          { return {&type, false, false, VarType::None}; }
-    std::vector<std::shared_ptr<void>>  Evaluate(void * inputs[]) const override            {
-
-        auto output = type.defaultConstructor();
-        for(auto & field : type.fields)
-        {
-            if(field.type.indirection == VarType::None && field.type.type->isTrivial)
-            {
-                memcpy(field.accessor(output.get()), *inputs, field.type.type->size);
-            }
-            ++inputs;
-        }
-        return {output};
-    }
+    std::vector<std::shared_ptr<void>>  Evaluate(void * inputs[]) const override
+                                        {
+                                            auto output = type.ConstructDefault();
+                                            for(auto & field : type.fields)
+                                            {
+                                                assert(field.type.indirection == VarType::None);
+                                                field.type.type->CopyAssign(field.accessor(output.get()), *inputs++);
+                                            }
+                                            return {output};
+                                        }
 };
 
 struct Node

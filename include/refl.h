@@ -41,6 +41,9 @@ struct Type
     std::function<std::shared_ptr<void>()> defaultConstructor;
 
                                         Type()                      : index(typeid(void)), size(), isTrivial(), kind(None), elementType(), classType(), isPointeeConst(), isPointeeVolatile() {}
+
+    std::shared_ptr<void>               ConstructDefault() const;
+    void                                CopyAssign(void * l, const void * r) const;
 };
 
 class Function

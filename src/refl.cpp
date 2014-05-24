@@ -1,5 +1,18 @@
 #include "refl.h"
 
+std::shared_ptr<void> Type::ConstructDefault() const
+{
+    if(isTrivial) return std::shared_ptr<void>(std::malloc(size), std::free); // Manage trivial types with malloc and free
+    if(defaultConstructor) return defaultConstructor(); // If the type has a constructor, invoke it
+    assert(false); return nullptr;
+}
+
+void Type::CopyAssign(void * l, const void * r) const
+{
+    if(isTrivial) memcpy(l, r, size);
+    else assert(false);
+}
+
 std::ostream & operator << (std::ostream & out, const Type & type)
 {
     switch(type.kind)
