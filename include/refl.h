@@ -109,21 +109,25 @@ class TypeLibrary
 public:
     template<class C> class ClassReflector
     {
-        TypeLibrary &                       lib;
-        Type &                              type;
+        TypeLibrary &                                   lib;
+        Type &                                          type;
     public:
-                                            ClassReflector(TypeLibrary & lib, Type & type)  : lib(lib), type(type) {}
-        template<class T> ClassReflector &  HasField(std::string name, T C::*field)         { type.fields.push_back({move(name), lib.DeduceVarType<T>(), [field](void * p) -> void * { return &(reinterpret_cast<C *>(p)->*field); }}); return *this; }
+                                                        ClassReflector(TypeLibrary & lib, Type & type)  : lib(lib), type(type) {}
+        template<class T> ClassReflector &              HasField(std::string name, T C::*field)         { type.fields.push_back({move(name), lib.DeduceVarType<T>(), [field](void * p) -> void * { return &(reinterpret_cast<C *>(p)->*field); }}); return *this; }
+        template<class R, class... P> ClassReflector &  HasMethod(std::string name, R (C::*method)(P...)               ) { lib.functions.push_back(lib.BindWithSignature(move(name), [method](               C & c, P... p) { return (c.*method)(std::forward<P>(p)...); }, (R(*)(               C &, P...))nullptr)); return *this; }
+        template<class R, class... P> ClassReflector &  HasMethod(std::string name, R (C::*method)(P...) const         ) { lib.functions.push_back(lib.BindWithSignature(move(name), [method](const          C & c, P... p) { return (c.*method)(std::forward<P>(p)...); }, (R(*)(const          C &, P...))nullptr)); return *this; }
+        template<class R, class... P> ClassReflector &  HasMethod(std::string name, R (C::*method)(P...)       volatile) { lib.functions.push_back(lib.BindWithSignature(move(name), [method](      volatile C & c, P... p) { return (c.*method)(std::forward<P>(p)...); }, (R(*)(      volatile C &, P...))nullptr)); return *this; }
+        template<class R, class... P> ClassReflector &  HasMethod(std::string name, R (C::*method)(P...) const volatile) { lib.functions.push_back(lib.BindWithSignature(move(name), [method](const volatile C & c, P... p) { return (c.*method)(std::forward<P>(p)...); }, (R(*)(const volatile C &, P...))nullptr)); return *this; }
     };
 
-    const std::vector<Function> &       GetAllFunctions() const                     { return functions; }
-    const Function *                    GetFunction(const char * name) const        { for(auto & f : functions) if(f.GetName() == name) return &f; return nullptr; }
-    const Type *                        GetType(std::type_index index) const        { auto it = types.find(index); return it != end(types) ? &it->second : nullptr; }
+    const std::vector<Function> &       GetAllFunctions() const                             { return functions; }
+    const Function *                    GetFunction(const char * name) const                { for(auto & f : functions) if(f.GetName() == name) return &f; return nullptr; }
+    const Type *                        GetType(std::type_index index) const                { auto it = types.find(index); return it != end(types) ? &it->second : nullptr; }
 
-    template<class F> void              BindFunction(F func, std::string name)      { functions.push_back(Bind(move(name), func)); }
-    template<class C> ClassReflector<C> BindClass(std::string name)                 { DeduceType<C>(); auto & type = types[typeid(C)]; type.className = move(name); return ClassReflector<C>(*this, type); }
-    template<class T> const Type &      DeduceType()                                { auto & type = types[typeid(T)]; if(type.kind == Type::None) { type.index = typeid(T); type.size = SizeOf<T>::VALUE; if(!std::is_trivial<T>::value) type.nonTrivialOps = std::make_unique<NontrivialOps>((T*)nullptr); InitType(type, (T*)nullptr); assert(type.kind != Type::None); } return type; }
-    template<class T> VarType           DeduceVarType()                             { typedef std::remove_reference_t<T> U; return { &DeduceType<std::remove_cv_t<U>>(), std::is_const<U>::value, std::is_volatile<U>::value, std::is_lvalue_reference<T>::value ? VarType::LValueRef : std::is_lvalue_reference<T>::value ? VarType::RValueRef : VarType::None }; }
+    template<class R, class... P> void  BindFunction(std::string name, R (*func)(P...))     { functions.push_back(BindWithSignature(move(name), func, (R(*)(P...))nullptr)); }
+    template<class C> ClassReflector<C> BindClass(std::string name)                         { DeduceType<C>(); auto & type = types[typeid(C)]; type.className = move(name); return ClassReflector<C>(*this, type); }
+    template<class T> const Type &      DeduceType()                                        { auto & type = types[typeid(T)]; if(type.kind == Type::None) { type.index = typeid(T); type.size = SizeOf<T>::VALUE; if(!std::is_trivial<T>::value) type.nonTrivialOps = std::make_unique<NontrivialOps>((T*)nullptr); InitType(type, (T*)nullptr); assert(type.kind != Type::None); } return type; }
+    template<class T> VarType           DeduceVarType()                                     { typedef std::remove_reference_t<T> U; return { &DeduceType<std::remove_cv_t<U>>(), std::is_const<U>::value, std::is_volatile<U>::value, std::is_lvalue_reference<T>::value ? VarType::LValueRef : std::is_lvalue_reference<T>::value ? VarType::RValueRef : VarType::None }; }
 
 private: // IMPLEMENTATION DETAILS
     std::map<std::type_index, Type>     types;
@@ -146,13 +150,6 @@ private: // IMPLEMENTATION DETAILS
     template<class R,          class... P> void InitType(Type & type, R     (*)(P...)               )   { type.kind = Type::Function; type.returnType = DeduceVarType<R>(); InitParameterList(type, (std::tuple<P...> *)nullptr); }
     template<         class T, class... P> void InitParameterList(Type & type, std::tuple<T,P...> * )   { type.paramTypes.push_back(DeduceVarType<T>()); InitParameterList(type, (std::tuple<P...> *)nullptr); }
                                            void InitParameterList(Type & type, std::tuple<      > * )   {}
-
-    // Bind accepts pointers to free functions and member functions, deduces the call signature, and passes the results to BindWithSignature
-    template<         class R, class... P> Function Bind(std::string name, R (   *func)(P...)               ) { return BindWithSignature(move(name),  func,                                                                             (R(*)(                    P...))nullptr); }
-    template<class C, class R, class... P> Function Bind(std::string name, R (C::*func)(P...)               ) { return BindWithSignature(move(name), [func](               C & c, P... p) { return (c.*func)(std::forward<P>(p)...); }, (R(*)(               C &, P...))nullptr); }
-    template<class C, class R, class... P> Function Bind(std::string name, R (C::*func)(P...) const         ) { return BindWithSignature(move(name), [func](const          C & c, P... p) { return (c.*func)(std::forward<P>(p)...); }, (R(*)(const          C &, P...))nullptr); }
-    template<class C, class R, class... P> Function Bind(std::string name, R (C::*func)(P...)       volatile) { return BindWithSignature(move(name), [func](      volatile C & c, P... p) { return (c.*func)(std::forward<P>(p)...); }, (R(*)(      volatile C &, P...))nullptr); }
-    template<class C, class R, class... P> Function Bind(std::string name, R (C::*func)(P...) const volatile) { return BindWithSignature(move(name), [func](const volatile C & c, P... p) { return (c.*func)(std::forward<P>(p)...); }, (R(*)(const volatile C &, P...))nullptr); }
 
     // BindWithSignature accepts a function option and a call signature, and creates a Function instance, with both metadata and an implementation which invokes CallWithArgs
     template<class F, class R, class... P> Function BindWithSignature(std::string name, F func, R   (*)(P...)) { return Function(move(name), DeduceType<R   (P...)>(), [func](void * args[]) { return std::make_shared<R>(CallWithArgs(func, args, (R(*)(P...))nullptr)); }); }

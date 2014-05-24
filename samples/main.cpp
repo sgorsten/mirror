@@ -216,19 +216,19 @@ struct Character
 int main(int argc, char * argv[])
 {
     TypeLibrary types;
-    types.BindFunction(&neg,"neg");
-    types.BindFunction(&add,"add");
-    types.BindFunction(&mul,"mul");
-    types.BindFunction(&negf,"negf");
-    types.BindFunction(&addf,"addf");
-    types.BindFunction(&mulf,"mulf");
-    types.BindFunction(&Character::move,"move");
-    types.BindFunction(&Character::damage,"damage");
-    types.BindFunction(&Character::heal,"heal");
+    types.BindFunction("neg", &neg);
+    types.BindFunction("add", &add);
+    types.BindFunction("mul", &mul);
+    types.BindFunction("negf", &negf);
+    types.BindFunction("addf", &addf);
+    types.BindFunction("mulf", &mulf);
     types.BindClass<Character>("Character")
         .HasField("x", &Character::x)
         .HasField("y", &Character::y)
-        .HasField("hp", &Character::hp);
+        .HasField("hp", &Character::hp)
+        .HasMethod("move", &Character::move)
+        .HasMethod("damage", &Character::damage)
+        .HasMethod("heal", &Character::heal);
 
     editor.nodes.push_back(Node(100, 100, types, Character()));
     editor.nodes.push_back(Node(100, 200, types, 2));
