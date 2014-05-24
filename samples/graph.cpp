@@ -31,8 +31,7 @@ void GraphEditor::ConnectPins(Feature a, Feature b)
         auto paramType = a.node->GetInputType(a.pin);
         auto argType = b.node->GetOutputType(b.pin);
         if(paramType.type != argType.type) return;
-
-        a.node->inputs[a.pin] = b.node - nodes.data();
+        a.node->inputs[a.pin] = {b.node - nodes.data(), b.pin};
     }
 }
 
@@ -41,9 +40,10 @@ void GraphEditor::RecomputeNode(Node & n)
     void * args[8];
     for(size_t i=0; i<n.inputs.size(); ++i)
     {
-        if(n.inputs[i] < 0) return;
-        if(!nodes[n.inputs[i]].outputValues[0]) return;
-        args[i] = nodes[n.inputs[i]].outputValues[0].get();
+        auto wire = n.inputs[i];
+        if(wire.nodeIndex < 0) return;
+        if(!nodes[wire.nodeIndex].outputValues[wire.pinIndex]) return;
+        args[i] = nodes[wire.nodeIndex].outputValues[wire.pinIndex].get();
     }
     n.outputValues = n.nodeType->Evaluate(args);
 }

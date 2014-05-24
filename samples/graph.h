@@ -60,15 +60,32 @@ public:
     std::vector<std::shared_ptr<void>>  Evaluate(void * inputs[]) const override            { return {nullptr}; }
 };
 
+class AccessFieldsNodeType : public INodeType
+{
+    const Type &                        type;
+public:
+                                        AccessFieldsNodeType(const Type & type)             : type(type) {}
+
+    void                                WriteLabel(std::ostream & out) const override       { out << "Access"; }
+    size_t                              GetInputCount() const override                      { return 1; }
+    size_t                              GetOutputCount() const override                     { return type.fields.size(); }
+    VarType                             GetInputType(size_t index) const override           { return {&type, false, false, VarType::LValueRef}; }
+    VarType                             GetOutputType(size_t index) const override          { return type.fields[index].type; }
+    std::vector<std::shared_ptr<void>>  Evaluate(void * inputs[]) const override            { std::vector<std::shared_ptr<void>> outputs; for(auto & field : type.fields) outputs.push_back(std::shared_ptr<void>(field.accessor(inputs[0]), [](void *){})); return outputs; }
+};
+
 struct Node
 {
+    struct Wire { int nodeIndex, pinIndex; };
+
     int                                 x,y;
     std::shared_ptr<const INodeType>    nodeType;
-    std::vector<int>                    inputs;
+    std::vector<Wire>                   inputs;
     std::vector<std::shared_ptr<void>>  outputValues;
 
                                         Node() : x(), y() {}
-                                        Node(int x, int y, const Function * function)       : x(x), y(y), nodeType(std::make_shared<FunctionNodeType>(*function)), inputs(GetInputCount(),-1), outputValues(nodeType->GetOutputCount()) {}
+                                        Node(int x, int y, const Function * function)       : x(x), y(y), nodeType(std::make_shared<FunctionNodeType>(*function)), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()) {}
+                                        Node(int x, int y, const Type & type)               : x(x), y(y), nodeType(std::make_shared<AccessFieldsNodeType>(type)), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()) {}
     template<class T>                   Node(int x, int y, TypeLibrary & types, T && value) : x(x), y(y), nodeType(std::make_shared<VariableNodeType>(types.DeduceVarType<T>())), outputValues({std::make_shared<T>(std::move(value))}) {}
 
     int                                 GetInputCount() const                               { return nodeType->GetInputCount(); }
@@ -98,8 +115,8 @@ struct Node
 
     Rect                                GetNodeRect() const                                 { return {x,y,x+GetSizeX(),y+GetSizeY()}; }
     Rect                                GetPinRect(int x, int y) const                      { return {x,y,x+GetPinSize(),y+GetPinSize()}; }
-    Rect                                GetInputPinRect(size_t i) const                     { return GetPinRect(x, y + (GetSizeY()-GetInputColumnSize())/2 + i*GetPinSpacing()); }
-    Rect                                GetOutputPinRect(size_t i) const                    { return GetPinRect(x+GetSizeX()-GetPinSize(), y + (GetSizeY()-GetOutputColumnSize())/2 + i*GetPinSpacing()); }
+    Rect                                GetInputPinRect(size_t i) const                     { return GetPinRect(x, y + (GetSizeY()-GetInputColumnSize())/2 + (int)i*GetPinSpacing()); }
+    Rect                                GetOutputPinRect(size_t i) const                    { return GetPinRect(x+GetSizeX()-GetPinSize(), y + (GetSizeY()-GetOutputColumnSize())/2 + (int)i*GetPinSpacing()); }
     Rect                                GetContentsRect() const                             { auto x0 = x+GetPinSize()+GetInputColumnLabelWidth()+GetColumnPadding(); return {x0, y, x0+GetContentsColumnWidth(), y+GetSizeY()}; }
 };
 

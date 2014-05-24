@@ -50,7 +50,7 @@ void OnMouse(int button, int state, int x, int y)
             editor.clickedFeature = editor.mouseOverFeature;
             if(editor.clickedFeature.type == Feature::Input)
             {
-                editor.clickedFeature.node->inputs[editor.clickedFeature.pin] = -1;
+                editor.clickedFeature.node->inputs[editor.clickedFeature.pin] = {-1,-1};
             }
         }
         else
@@ -157,9 +157,10 @@ void OnDisplay()
     {
         for(size_t i=0; i<n.inputs.size(); ++i)
         {
-            if(n.inputs[i] >= 0 && n.inputs[i] < editor.nodes.size())
+            auto wire = n.inputs[i];
+            if(wire.nodeIndex >= 0 && wire.nodeIndex < editor.nodes.size())
             {
-                auto a = editor.nodes[n.inputs[i]].GetOutputPinRect(0);
+                auto a = editor.nodes[wire.nodeIndex].GetOutputPinRect(wire.pinIndex);
                 auto b = n.GetInputPinRect(i);
                 glVertex2f((a.x0+a.x1)*0.5f, (a.y0+a.y1)*0.5f);
                 glVertex2f((b.x0+b.x1)*0.5f, (b.y0+b.y1)*0.5f);
@@ -207,10 +208,6 @@ struct Character
 
     Character() : x(), y(), hp(100) {}
 
-    float getX() const { return x; }
-    float getY() const { return y; }
-    int getHp() const { return hp; }
-
     void move(float dx, float dy) { x+=dx; y+=dy; }
     void damage(int dmg) { hp -= dmg; }
     void heal(int healing) { hp += healing; }
@@ -225,12 +222,12 @@ int main(int argc, char * argv[])
     types.BindFunction(&negf,"negf");
     types.BindFunction(&addf,"addf");
     types.BindFunction(&mulf,"mulf");
-    types.BindFunction(&Character::getX,"getX");
-    types.BindFunction(&Character::getY,"getY");
-    types.BindFunction(&Character::getHp,"getHp");
     types.BindFunction(&Character::move,"move");
     types.BindFunction(&Character::damage,"damage");
     types.BindFunction(&Character::heal,"heal");
+    types.BindField("x", &Character::x);
+    types.BindField("y", &Character::y);
+    types.BindField("hp", &Character::hp);
 
     editor.nodes.push_back(Node(100, 100, types, Character()));
     editor.nodes.push_back(Node(100, 200, types, 2));
@@ -245,12 +242,11 @@ int main(int argc, char * argv[])
     editor.nodes.push_back(Node(500, 500, types.GetFunction("addf")));
     editor.nodes.push_back(Node(500, 600, types.GetFunction("mulf")));
 
-    editor.nodes.push_back(Node(900, 100, types.GetFunction("getX")));
-    editor.nodes.push_back(Node(900, 200, types.GetFunction("getY")));
-    editor.nodes.push_back(Node(900, 300, types.GetFunction("getHp")));
     editor.nodes.push_back(Node(900, 400, types.GetFunction("move")));
     editor.nodes.push_back(Node(900, 500, types.GetFunction("damage")));
     editor.nodes.push_back(Node(900, 600, types.GetFunction("heal")));
+
+    editor.nodes.push_back(Node(300, 200, types.DeduceType<Character>()));
 
     glutInit(&argc, argv);
     glutInitWindowSize(1280, 720);

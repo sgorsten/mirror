@@ -24,6 +24,7 @@ struct VarType
 
 struct Type
 {
+    struct                              Field                       { std::string identifier; VarType type; std::function<void *(void *)> accessor; };
     enum                                Kind                        { None, Fundamental, Class, Union, Enum, Array, Pointer, Function };
 
     std::type_index                     index;
@@ -36,6 +37,7 @@ struct Type
     VarType                             returnType;                 // (Function) The return type of the function.
     bool                                isPointeeConst;
     bool                                isPointeeVolatile;
+    std::vector<Field>                  fields;
 
                                         Type()                      : index(typeid(void)), size(), isTrivial(), kind(None), elementType(), classType(), isPointeeConst(), isPointeeVolatile() {}
 };
@@ -67,6 +69,7 @@ public:
     template<class F> void              BindFunction(F func, std::string name)      { functions.push_back(Bind(move(name), func)); }
     template<class T> const Type &      DeduceType()                                { auto & type = types[typeid(T)]; if(type.kind == Type::None) { type.index = typeid(T); type.size = SizeOf<T>::VALUE; type.isTrivial = std::is_trivial<T>::value; InitType(type, (T*)nullptr); assert(type.kind != Type::None); } return type; }
     template<class T> VarType           DeduceVarType()                             { typedef std::remove_reference_t<T> U; return { &DeduceType<std::remove_cv_t<U>>(), std::is_const<U>::value, std::is_volatile<U>::value, std::is_lvalue_reference<T>::value ? VarType::LValueRef : std::is_lvalue_reference<T>::value ? VarType::RValueRef : VarType::None }; }
+    template<class C, class T> void     BindField(std::string name, T C::*field)    { DeduceType<C>(); types[typeid(C)].fields.push_back({move(name), DeduceVarType<T>(), [field](void * p) -> void * { return &(reinterpret_cast<C *>(p)->*field); }}); }
 
 private: // IMPLEMENTATION DETAILS
     std::map<std::type_index, Type>     types;
