@@ -22,89 +22,73 @@ int GetStringWidth18(const std::string & text);
 void WriteValue(std::ostream & out, const Type & type, void * value);
 std::string ToStr(const Type & type, void * value);
 
-struct INodeType
+struct NodeType
 {
-    virtual void WriteLabel(std::ostream & out) const = 0;
-    virtual size_t GetInputCount() const = 0;
-    virtual size_t GetOutputCount() const = 0;
-    virtual VarType GetInputType(size_t index) const = 0;
-    virtual VarType GetOutputType(size_t index) const = 0;
-    virtual std::string GetInputLabel(size_t index) const = 0;
-    virtual std::string GetOutputLabel(size_t index) const = 0;
-    virtual std::vector<std::shared_ptr<void>> Evaluate(void * inputs[]) const = 0;
-};
+    struct Pin { std::string label; VarType type; };
+    std::string label;
+    std::vector<Pin> inputs, outputs;
+    std::function<std::vector<std::shared_ptr<void>>(void **)> eval;
 
-class FunctionNodeType : public INodeType
-{
-    const Function &                    function;
-public:
-                                        FunctionNodeType(const Function & function)         : function(function) {}
+    void WriteLabel(std::ostream & out) const { out << label; }
+    size_t GetInputCount() const { return inputs.size(); }
+    size_t GetOutputCount() const { return outputs.size(); }
+    VarType GetInputType(size_t index) const { return inputs[index].type; }
+    VarType GetOutputType(size_t index) const { return outputs[index].type; }
+    std::string GetInputLabel(size_t index) const { return inputs[index].label; }
+    std::string GetOutputLabel(size_t index) const { return outputs[index].label; }
+    std::vector<std::shared_ptr<void>> Evaluate(void * inputs[]) const { return eval(inputs); }
 
-    void                                WriteLabel(std::ostream & out) const override       { out << function.GetName(); }
-    size_t                              GetInputCount() const override                      { return function.GetParamTypes().size(); }
-    size_t                              GetOutputCount() const override                     { return 1; }
-    VarType                             GetInputType(size_t index) const override           { return function.GetParamTypes()[index]; }
-    VarType                             GetOutputType(size_t index) const override          { return function.GetReturnType(); }
-    std::string                         GetInputLabel(size_t index) const override          { return function.GetParamName(index); }
-    std::string                         GetOutputLabel(size_t index) const override         { return {}; }
-    std::vector<std::shared_ptr<void>>  Evaluate(void * inputs[]) const override            { return {function.Invoke(inputs)}; }
-};
+    static NodeType MakeFunctionNode(const Function & function)
+    {
+        NodeType n;
+        n.label = function.GetName();
+        for(size_t i=0; i<function.GetParamCount(); ++i) n.inputs.push_back({function.GetParamName(i), function.GetParamType(i)});
+        n.outputs.push_back({"", function.GetReturnType()});
+        n.eval = [&function](void ** inputs) { return std::vector<std::shared_ptr<void>>{function.Invoke(inputs)}; };
+        return n;
+    }
 
-class VariableNodeType : public INodeType
-{
-    VarType                             type;
-public:
-                                        VariableNodeType(const VarType & type)              : type(type) {}
+    static NodeType MakeVariableNode(const VarType & type)
+    {
+        NodeType n;
+        n.label = "var";
+        n.outputs.push_back({"", type});
+        return n;
+    }
 
-    void                                WriteLabel(std::ostream & out) const override       {}
-    size_t                              GetInputCount() const override                      { return 0; }
-    size_t                              GetOutputCount() const override                     { return 1; }
-    std::string                         GetInputLabel(size_t index) const override          { assert(false); return {}; }
-    VarType                             GetInputType(size_t index) const override           { assert(false); return {}; }
-    VarType                             GetOutputType(size_t index) const override          { assert(index == 0); return type; }
-    std::string                         GetOutputLabel(size_t index) const override         { return {}; }
-    std::vector<std::shared_ptr<void>>  Evaluate(void * inputs[]) const override            { return {nullptr}; }
-};
+    static NodeType MakeSplitNode(const Type & type)
+    {
+        NodeType n;
+        n.label = ToString() << "split " << type;
+        n.inputs.push_back({"", {&type, false, false, VarType::LValueRef}});
+        for(auto & f : type.fields) n.outputs.push_back({f.identifier, f.type});
+        n.eval = [&type](void ** inputs) 
+        {
+            std::vector<std::shared_ptr<void>> outputs; 
+            for(auto & field : type.fields) outputs.push_back(std::shared_ptr<void>(field.accessor(inputs[0]), [](void *){}));
+            return outputs; 
+        };
+        return n;
+    }
 
-class AccessFieldsNodeType : public INodeType
-{
-    const Type &                        type;
-public:
-                                        AccessFieldsNodeType(const Type & type)             : type(type) {}
-
-    void                                WriteLabel(std::ostream & out) const override       { out << "Access"; }
-    size_t                              GetInputCount() const override                      { return 1; }
-    size_t                              GetOutputCount() const override                     { return type.fields.size(); }
-    VarType                             GetInputType(size_t index) const override           { assert(index == 0); return {&type, false, false, VarType::LValueRef}; }
-    VarType                             GetOutputType(size_t index) const override          { return type.fields[index].type; }
-    std::string                         GetInputLabel(size_t index) const override          { return {}; }
-    std::string                         GetOutputLabel(size_t index) const override         { return type.fields[index].identifier; }
-    std::vector<std::shared_ptr<void>>  Evaluate(void * inputs[]) const override            { std::vector<std::shared_ptr<void>> outputs; for(auto & field : type.fields) outputs.push_back(std::shared_ptr<void>(field.accessor(inputs[0]), [](void *){})); return outputs; }
-};
-
-class ConstructFromFieldsNodeType : public INodeType
-{
-    const Type &                        type;
-public:
-                                        ConstructFromFieldsNodeType(const Type & type)      : type(type) {}
-
-    void                                WriteLabel(std::ostream & out) const override       { out << "Construct"; }
-    size_t                              GetInputCount() const override                      { return type.fields.size(); }
-    size_t                              GetOutputCount() const override                     { return 1; }
-    VarType                             GetInputType(size_t index) const override           { return type.fields[index].type; }
-    VarType                             GetOutputType(size_t index) const override          { return {&type, false, false, VarType::None}; }
-    std::string                         GetInputLabel(size_t index) const override          { return type.fields[index].identifier; }
-    std::string                         GetOutputLabel(size_t index) const override         { return {}; }
-    std::vector<std::shared_ptr<void>>  Evaluate(void * inputs[]) const override
-                                        {
-                                            auto output = type.DefConstruct();
-                                            for(auto & field : type.fields)
-                                            {
-                                                assert(field.type.indirection == VarType::None);
-                                                field.type.type->CopyAssign(field.accessor(output.get()), *inputs++);
-                                            }
-                                            return {output};
-                                        }
+    static NodeType MakeBuildNode(const Type & type)
+    {
+        NodeType n;
+        n.label = ToString() << "build " << type;
+        for(auto & f : type.fields) n.inputs.push_back({f.identifier, f.type});
+        n.outputs.push_back({"", {&type, false, false, VarType::None}});
+        n.eval = [&type](void ** inputs) -> std::vector<std::shared_ptr<void>>
+        {
+            auto output = type.DefConstruct();
+            for(auto & field : type.fields)
+            {
+                assert(field.type.indirection == VarType::None);
+                field.type.type->CopyAssign(field.accessor(output.get()), *inputs++);
+            }
+            return {output};
+        };
+        return n;
+    }
 };
 
 struct Node
@@ -112,15 +96,15 @@ struct Node
     struct Wire { int nodeIndex, pinIndex; };
 
     int                                 x,y;
-    std::shared_ptr<const INodeType>    nodeType;
+    std::shared_ptr<const NodeType>     nodeType;
     std::vector<Wire>                   inputs;
     std::vector<std::shared_ptr<void>>  outputValues;
 
                                         Node() : x(), y() {}
-                                        Node(int x, int y, const Function * function)       : x(x), y(y), nodeType(std::make_shared<FunctionNodeType>(*function)), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()) {}
-                                        Node(int x, int y, const Type & type)               : x(x), y(y), nodeType(std::make_shared<AccessFieldsNodeType>(type)), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()) {}
-                                        Node(int x, int y, const Type & type, int)          : x(x), y(y), nodeType(std::make_shared<ConstructFromFieldsNodeType>(type)), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()) {}
-    template<class T>                   Node(int x, int y, TypeLibrary & types, T && value) : x(x), y(y), nodeType(std::make_shared<VariableNodeType>(types.DeduceVarType<T>())), outputValues({std::make_shared<T>(std::move(value))}) {}
+                                        Node(int x, int y, const Function * function)       : x(x), y(y), nodeType(std::make_shared<NodeType>(NodeType::MakeFunctionNode(*function))), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()) {}
+                                        Node(int x, int y, const Type & type)               : x(x), y(y), nodeType(std::make_shared<NodeType>(NodeType::MakeSplitNode(type))), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()) {}
+                                        Node(int x, int y, const Type & type, int)          : x(x), y(y), nodeType(std::make_shared<NodeType>(NodeType::MakeBuildNode(type))), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()) {}
+    template<class T>                   Node(int x, int y, TypeLibrary & types, T && value) : x(x), y(y), nodeType(std::make_shared<NodeType>(NodeType::MakeVariableNode(types.DeduceVarType<T>()))), outputValues({std::make_shared<T>(std::move(value))}) {}
 
     int                                 GetInputCount() const                               { return nodeType->GetInputCount(); }
     int                                 GetOutputCount() const                              { return nodeType->GetOutputCount(); }
@@ -147,7 +131,7 @@ struct Node
 
     int                                 GetInputColumnLabelWidth() const                    { int w=0; for(size_t i=0, n=GetInputCount(); i!=n; ++i) w = std::max(w, GetStringWidth12(GetInputLabel(i))); return w; }
     int                                 GetContentsColumnWidth() const                      { std::ostringstream ss; nodeType->WriteLabel(ss); return GetStringWidth18(ss.str()); }
-    int                                 GetOutputColumnLabelWidth() const                   { int w=0; for(size_t i=0, n=GetOutputCount(); i!=n; ++i) w = std::max(w, GetStringWidth12(ToString() << ToStr(*GetOutputType(i).type, outputValues[i].get()) << " : " << GetOutputLabel(i))); return w; }
+    int                                 GetOutputColumnLabelWidth() const                   { int w=0; for(size_t i=0, n=GetOutputCount(); i!=n; ++i) w = std::max(w, GetStringWidth12(GetOutputLabel(i))); return w; }
     int                                 GetSizeX() const                                    { return GetPinSpacing() * 2 + GetInputColumnLabelWidth() + GetContentsColumnWidth() + GetOutputColumnLabelWidth() + GetColumnPadding() * 2; }
 
     Rect                                GetNodeRect() const                                 { return {x,y,x+GetSizeX(),y+GetSizeY()}; }

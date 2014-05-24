@@ -127,6 +127,13 @@ void OnDisplay()
 
             glColor3f(1,1,1);
             RenderText12(rect.x1 + n.GetPinPadding(), rect.y0, n.GetInputLabel(i));
+            if(n.inputs[i].nodeIndex >= 0)
+            {
+                auto & n2 = editor.nodes[n.inputs[i].nodeIndex];
+                auto pin = n.inputs[i].pinIndex;
+                std::string val = ToStr(*n2.GetOutputType(pin).type, n2.outputValues[pin].get());
+                RenderText12(rect.x0 - n.GetPinPadding() - GetStringWidth12(val), rect.y0, val);
+            }
         }
 
         for(size_t i=0; i<n.GetOutputCount(); ++i)
@@ -141,12 +148,10 @@ void OnDisplay()
             glVertex2i(rect.x0,rect.y1);
             glEnd();
 
-            std::ostringstream ss;
-            if(n.outputValues[i]) { WriteValue(ss, *n.GetOutputType(i).type, n.outputValues[i].get()); ss << " : "; }
-            ss << n.GetOutputLabel(i);
-            std::string s = ss.str();
             glColor3f(1,1,1);
-            RenderText12(rect.x0 - n.GetPinPadding() - GetStringWidth12(s), rect.y0, s);
+            auto lbl = n.GetOutputLabel(i);
+            RenderText12(rect.x0 - n.GetPinPadding() - GetStringWidth12(lbl), rect.y0, lbl);
+            RenderText12(rect.x1 + n.GetPinPadding(), rect.y0, ToStr(*n.GetOutputType(i).type, n.outputValues[i].get()));
         }
     }
 

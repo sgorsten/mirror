@@ -184,6 +184,7 @@ private: // IMPLEMENTATION DETAILS
     template<class T> static T    PassArg(void * addr, Tag<T   >) { return T(std::move(*reinterpret_cast<T *>(addr))); } // For value types, move-construct a new value from the original
 };
 
+std::ostream & operator << (std::ostream & out, const Type & type);
 std::ostream & operator << (std::ostream & out, const VarType & vt);
 std::ostream & operator << (std::ostream & out, const Function & f);
 
