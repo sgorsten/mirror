@@ -126,7 +126,7 @@ void OnDisplay()
             glEnd();
 
             glColor3f(1,1,1);
-            RenderText12(rect.x1 + n.GetPinPadding(), rect.y0, ToString() << n.nodeType->GetInputType(i));
+            RenderText12(rect.x1 + n.GetPinPadding(), rect.y0, n.GetInputLabel(i));
         }
 
         for(size_t i=0; i<n.GetOutputCount(); ++i)
@@ -143,7 +143,7 @@ void OnDisplay()
 
             std::ostringstream ss;
             if(n.outputValues[i]) { WriteValue(ss, *n.GetOutputType(i).type, n.outputValues[i].get()); ss << " : "; }
-            ss << n.nodeType->GetOutputType(i);
+            ss << n.GetOutputType(i);
             std::string s = ss.str();
             glColor3f(1,1,1);
             RenderText12(rect.x0 - n.GetPinPadding() - GetStringWidth12(s), rect.y0, s);
@@ -186,6 +186,23 @@ void OnDisplay()
         glVertex2i(editor.lastX, editor.lastY);
     }
     glEnd();
+
+    if(editor.mouseOverFeature.type == Feature::Input)
+    {
+        std::string s = ToString() << editor.mouseOverFeature.node->GetInputType(editor.mouseOverFeature.pin);
+        
+        auto w = GetStringWidth12(s);
+        glBegin(GL_QUADS);
+        glColor3f(0,0,0);
+        glVertex2i(editor.lastX, editor.lastY);
+        glVertex2i(editor.lastX, editor.lastY-16);
+        glVertex2i(editor.lastX+w, editor.lastY-16);
+        glVertex2i(editor.lastX+w, editor.lastY);
+        glEnd();
+
+        glColor3f(1,1,1);
+        RenderText12(editor.lastX, editor.lastY-16, s);
+    }
 
     glPopMatrix();   
     glPopAttrib();
@@ -231,6 +248,10 @@ int main(int argc, char * argv[])
         .HasMethod("damage", &Character::damage)
         .HasMethod("heal", &Character::heal)
         .HasConstructor<int>();
+    types.NameParameter("move",0,"this");
+    types.NameParameter("move",1,"dx");
+    types.NameParameter("move",2,"dy");
+    types.NameParameter("Character",0,"hp");
 
     editor.nodes.push_back(Node(100, 100, types, Character()));
     editor.nodes.push_back(Node(100, 200, types, 2));

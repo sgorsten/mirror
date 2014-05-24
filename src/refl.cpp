@@ -1,8 +1,8 @@
 #include "refl.h"
 
-std::shared_ptr<void> Type::DefaultConstruct() const
+std::shared_ptr<void> Type::DefConstruct() const
 {
-    assert(IsDefaultConstructible());
+    assert(IsDefConstructible());
     if(IsTrivial()) return std::shared_ptr<void>(std::malloc(size), std::free); // Manage trivial types with malloc and free
     else return nonTrivialOps->defConstruct(); // If the type has a constructor, invoke it
 }
@@ -12,7 +12,7 @@ std::shared_ptr<void> Type::CopyConstruct(const void * r) const
     assert(IsCopyConstructible());
     if(IsTrivial())
     {
-        auto obj = DefaultConstruct();
+        auto obj = DefConstruct();
         CopyAssign(obj.get(), r);
         return obj;
     }
