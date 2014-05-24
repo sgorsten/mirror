@@ -1,16 +1,43 @@
 #include "refl.h"
 
-std::shared_ptr<void> Type::ConstructDefault() const
+std::shared_ptr<void> Type::DefaultConstruct() const
 {
-    if(isTrivial) return std::shared_ptr<void>(std::malloc(size), std::free); // Manage trivial types with malloc and free
-    if(defaultConstructor) return defaultConstructor(); // If the type has a constructor, invoke it
-    assert(false); return nullptr;
+    assert(IsDefaultConstructible());
+    if(IsTrivial()) return std::shared_ptr<void>(std::malloc(size), std::free); // Manage trivial types with malloc and free
+    else return nonTrivialOps->defConstruct(); // If the type has a constructor, invoke it
+}
+
+std::shared_ptr<void> Type::CopyConstruct(const void * r) const
+{
+    assert(IsCopyConstructible());
+    if(IsTrivial())
+    {
+        auto obj = DefaultConstruct();
+        CopyAssign(obj.get(), r);
+        return obj;
+    }
+    else return nonTrivialOps->copyConstruct(r);
+}
+
+std::shared_ptr<void> Type::MoveConstruct(void * r) const
+{
+    assert(IsMoveConstructible());
+    if(IsTrivial()) return CopyConstruct(r);
+    else return nonTrivialOps->moveConstruct(r);
 }
 
 void Type::CopyAssign(void * l, const void * r) const
 {
-    if(isTrivial) memcpy(l, r, size);
-    else assert(false);
+    assert(IsCopyAssignable());
+    if(IsTrivial()) memcpy(l, r, size);
+    else nonTrivialOps->copyAssign(l, r);
+}
+
+void Type::MoveAssign(void * l, void * r) const
+{
+    assert(IsMoveAssignable());
+    if(IsTrivial()) CopyAssign(l, r);
+    else nonTrivialOps->moveAssign(l, r);
 }
 
 std::ostream & operator << (std::ostream & out, const Type & type)

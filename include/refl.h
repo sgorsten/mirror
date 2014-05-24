@@ -22,6 +22,35 @@ struct VarType
     Indirection                         indirection;
 };
 
+struct NontrivialOps
+{
+    std::function<std::shared_ptr<void>(            )> defConstruct;
+    std::function<std::shared_ptr<void>(const void *)> copyConstruct;
+    std::function<std::shared_ptr<void>(      void *)> moveConstruct;
+    std::function<void(void*,const void*)>             copyAssign;
+    std::function<void(void*,void*)>                   moveAssign;
+
+    template<class C> NontrivialOps(C *)
+    {
+        SetupDefConstruct<C>(std::is_default_constructible<C>());
+        SetupCopyConstruct<C>(std::is_copy_constructible<C>());
+        SetupMoveConstruct<C>(std::is_move_constructible<C>());
+        SetupCopyAssign<C>(std::is_copy_assignable<C>());
+        SetupMoveAssign<C>(std::is_move_assignable<C>());
+    }
+private:
+    template<class C> void SetupDefConstruct (std::true_type) { defConstruct  = [](              ) { return std::make_shared<C>(                                          ); }; } 
+    template<class C> void SetupCopyConstruct(std::true_type) { copyConstruct = [](const void * r) { return std::make_shared<C>(          *reinterpret_cast<const C *>(r) ); }; }
+    template<class C> void SetupMoveConstruct(std::true_type) { moveConstruct = [](      void * r) { return std::make_shared<C>(std::move(*reinterpret_cast<      C *>(r))); }; }
+    template<class C> void SetupCopyAssign   (std::true_type) { copyAssign = [](void * l, const void * r) { *reinterpret_cast<C *>(l) =           *reinterpret_cast<const C *>(r);  }; }
+    template<class C> void SetupMoveAssign   (std::true_type) { moveAssign = [](void * l,       void * r) { *reinterpret_cast<C *>(l) = std::move(*reinterpret_cast<      C *>(r)); }; }
+    template<class C> void SetupDefConstruct (std::false_type) {}
+    template<class C> void SetupCopyConstruct(std::false_type) {}
+    template<class C> void SetupMoveConstruct(std::false_type) {}
+    template<class C> void SetupCopyAssign   (std::false_type) {}
+    template<class C> void SetupMoveAssign   (std::false_type) {}  
+};
+
 struct Type
 {
     struct                              Field                       { std::string identifier; VarType type; std::function<void *(void *)> accessor; };
@@ -29,7 +58,7 @@ struct Type
 
     std::type_index                     index;
     size_t                              size;
-    bool                                isTrivial;
+    std::unique_ptr<NontrivialOps>      nonTrivialOps;              // If non-null, this is a non-trivial type, and we need to use special functions for construction, copy, move, etc.
     Kind                                kind;
     const Type *                        elementType;                // (Array, Pointer) For arrays, the type of an element. For pointers, the type of the pointed-to variable or function.
     const Type *                        classType;                  // (Pointer) If this is a pointer to member, the type of the object the pointee is a member of, null otherwise.
@@ -37,13 +66,25 @@ struct Type
     VarType                             returnType;                 // (Function) The return type of the function.
     bool                                isPointeeConst;
     bool                                isPointeeVolatile;
+
+    std::string                         className;
     std::vector<Field>                  fields;
-    std::function<std::shared_ptr<void>()> defaultConstructor;
+    
 
-                                        Type()                      : index(typeid(void)), size(), isTrivial(), kind(None), elementType(), classType(), isPointeeConst(), isPointeeVolatile() {}
+                                        Type()                      : index(typeid(void)), size(), kind(None), elementType(), classType(), isPointeeConst(), isPointeeVolatile() {}
 
-    std::shared_ptr<void>               ConstructDefault() const;
+    bool                                IsTrivial() const                               { return !nonTrivialOps; }
+    bool                                IsDefaultConstructible() const                  { return IsTrivial() || nonTrivialOps->defConstruct; }
+    bool                                IsCopyConstructible() const                     { return IsTrivial() || nonTrivialOps->copyConstruct; }
+    bool                                IsMoveConstructible() const                     { return IsTrivial() || nonTrivialOps->moveConstruct; }
+    bool                                IsCopyAssignable() const                        { return IsTrivial() || nonTrivialOps->copyAssign; }
+    bool                                IsMoveAssignable() const                        { return IsTrivial() || nonTrivialOps->moveAssign; }
+
+    std::shared_ptr<void>               DefaultConstruct() const;
+    std::shared_ptr<void>               CopyConstruct(const void * r) const;
+    std::shared_ptr<void>               MoveConstruct(      void * r) const;
     void                                CopyAssign(void * l, const void * r) const;
+    void                                MoveAssign(void * l,       void * r) const;
 };
 
 class Function
@@ -66,15 +107,23 @@ public:
 class TypeLibrary
 {
 public:
+    template<class C> class ClassReflector
+    {
+        TypeLibrary &                       lib;
+        Type &                              type;
+    public:
+                                            ClassReflector(TypeLibrary & lib, Type & type)  : lib(lib), type(type) {}
+        template<class T> ClassReflector &  HasField(std::string name, T C::*field)         { type.fields.push_back({move(name), lib.DeduceVarType<T>(), [field](void * p) -> void * { return &(reinterpret_cast<C *>(p)->*field); }}); return *this; }
+    };
+
     const std::vector<Function> &       GetAllFunctions() const                     { return functions; }
     const Function *                    GetFunction(const char * name) const        { for(auto & f : functions) if(f.GetName() == name) return &f; return nullptr; }
     const Type *                        GetType(std::type_index index) const        { auto it = types.find(index); return it != end(types) ? &it->second : nullptr; }
 
     template<class F> void              BindFunction(F func, std::string name)      { functions.push_back(Bind(move(name), func)); }
-    template<class T> const Type &      DeduceType()                                { auto & type = types[typeid(T)]; if(type.kind == Type::None) { type.index = typeid(T); type.size = SizeOf<T>::VALUE; type.isTrivial = std::is_trivial<T>::value; InitType(type, (T*)nullptr); assert(type.kind != Type::None); } return type; }
+    template<class C> ClassReflector<C> BindClass(std::string name)                 { DeduceType<C>(); auto & type = types[typeid(C)]; type.className = move(name); return ClassReflector<C>(*this, type); }
+    template<class T> const Type &      DeduceType()                                { auto & type = types[typeid(T)]; if(type.kind == Type::None) { type.index = typeid(T); type.size = SizeOf<T>::VALUE; if(!std::is_trivial<T>::value) type.nonTrivialOps = std::make_unique<NontrivialOps>((T*)nullptr); InitType(type, (T*)nullptr); assert(type.kind != Type::None); } return type; }
     template<class T> VarType           DeduceVarType()                             { typedef std::remove_reference_t<T> U; return { &DeduceType<std::remove_cv_t<U>>(), std::is_const<U>::value, std::is_volatile<U>::value, std::is_lvalue_reference<T>::value ? VarType::LValueRef : std::is_lvalue_reference<T>::value ? VarType::RValueRef : VarType::None }; }
-    template<class C, class T> void     BindField(std::string name, T C::*field)    { DeduceType<C>(); types[typeid(C)].fields.push_back({move(name), DeduceVarType<T>(), [field](void * p) -> void * { return &(reinterpret_cast<C *>(p)->*field); }}); }
-    template<class T> void              BindDefaultConstructor()                    { DeduceType<T>(); types[typeid(T)].defaultConstructor = []() { return std::make_shared<T>(); }; }
 
 private: // IMPLEMENTATION DETAILS
     std::map<std::type_index, Type>     types;

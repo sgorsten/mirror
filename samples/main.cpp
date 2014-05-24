@@ -225,10 +225,10 @@ int main(int argc, char * argv[])
     types.BindFunction(&Character::move,"move");
     types.BindFunction(&Character::damage,"damage");
     types.BindFunction(&Character::heal,"heal");
-    types.BindField("x", &Character::x);
-    types.BindField("y", &Character::y);
-    types.BindField("hp", &Character::hp);
-    types.BindDefaultConstructor<Character>();
+    types.BindClass<Character>("Character")
+        .HasField("x", &Character::x)
+        .HasField("y", &Character::y)
+        .HasField("hp", &Character::hp);
 
     editor.nodes.push_back(Node(100, 100, types, Character()));
     editor.nodes.push_back(Node(100, 200, types, 2));

@@ -87,7 +87,7 @@ public:
     VarType                             GetOutputType(size_t index) const override          { return {&type, false, false, VarType::None}; }
     std::vector<std::shared_ptr<void>>  Evaluate(void * inputs[]) const override
                                         {
-                                            auto output = type.ConstructDefault();
+                                            auto output = type.DefaultConstruct();
                                             for(auto & field : type.fields)
                                             {
                                                 assert(field.type.indirection == VarType::None);
