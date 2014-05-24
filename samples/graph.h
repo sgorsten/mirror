@@ -74,6 +74,32 @@ public:
     std::vector<std::shared_ptr<void>>  Evaluate(void * inputs[]) const override            { std::vector<std::shared_ptr<void>> outputs; for(auto & field : type.fields) outputs.push_back(std::shared_ptr<void>(field.accessor(inputs[0]), [](void *){})); return outputs; }
 };
 
+class ConstructFromFieldsNodeType : public INodeType
+{
+    const Type &                        type;
+public:
+                                        ConstructFromFieldsNodeType(const Type & type)      : type(type) {}
+
+    void                                WriteLabel(std::ostream & out) const override       { out << "Construct"; }
+    size_t                              GetInputCount() const override                      { return type.fields.size(); }
+    size_t                              GetOutputCount() const override                     { return 1; }
+    VarType                             GetInputType(size_t index) const override           { return type.fields[index].type; }
+    VarType                             GetOutputType(size_t index) const override          { return {&type, false, false, VarType::None}; }
+    std::vector<std::shared_ptr<void>>  Evaluate(void * inputs[]) const override            {
+
+        auto output = type.defaultConstructor();
+        for(auto & field : type.fields)
+        {
+            if(field.type.indirection == VarType::None && field.type.type->isTrivial)
+            {
+                memcpy(field.accessor(output.get()), *inputs, field.type.type->size);
+            }
+            ++inputs;
+        }
+        return {output};
+    }
+};
+
 struct Node
 {
     struct Wire { int nodeIndex, pinIndex; };
@@ -86,6 +112,7 @@ struct Node
                                         Node() : x(), y() {}
                                         Node(int x, int y, const Function * function)       : x(x), y(y), nodeType(std::make_shared<FunctionNodeType>(*function)), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()) {}
                                         Node(int x, int y, const Type & type)               : x(x), y(y), nodeType(std::make_shared<AccessFieldsNodeType>(type)), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()) {}
+                                        Node(int x, int y, const Type & type, int)          : x(x), y(y), nodeType(std::make_shared<ConstructFromFieldsNodeType>(type)), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()) {}
     template<class T>                   Node(int x, int y, TypeLibrary & types, T && value) : x(x), y(y), nodeType(std::make_shared<VariableNodeType>(types.DeduceVarType<T>())), outputValues({std::make_shared<T>(std::move(value))}) {}
 
     int                                 GetInputCount() const                               { return nodeType->GetInputCount(); }

@@ -38,6 +38,7 @@ struct Type
     bool                                isPointeeConst;
     bool                                isPointeeVolatile;
     std::vector<Field>                  fields;
+    std::function<std::shared_ptr<void>()> defaultConstructor;
 
                                         Type()                      : index(typeid(void)), size(), isTrivial(), kind(None), elementType(), classType(), isPointeeConst(), isPointeeVolatile() {}
 };
@@ -70,6 +71,7 @@ public:
     template<class T> const Type &      DeduceType()                                { auto & type = types[typeid(T)]; if(type.kind == Type::None) { type.index = typeid(T); type.size = SizeOf<T>::VALUE; type.isTrivial = std::is_trivial<T>::value; InitType(type, (T*)nullptr); assert(type.kind != Type::None); } return type; }
     template<class T> VarType           DeduceVarType()                             { typedef std::remove_reference_t<T> U; return { &DeduceType<std::remove_cv_t<U>>(), std::is_const<U>::value, std::is_volatile<U>::value, std::is_lvalue_reference<T>::value ? VarType::LValueRef : std::is_lvalue_reference<T>::value ? VarType::RValueRef : VarType::None }; }
     template<class C, class T> void     BindField(std::string name, T C::*field)    { DeduceType<C>(); types[typeid(C)].fields.push_back({move(name), DeduceVarType<T>(), [field](void * p) -> void * { return &(reinterpret_cast<C *>(p)->*field); }}); }
+    template<class T> void              BindDefaultConstructor()                    { DeduceType<T>(); types[typeid(T)].defaultConstructor = []() { return std::make_shared<T>(); }; }
 
 private: // IMPLEMENTATION DETAILS
     std::map<std::type_index, Type>     types;

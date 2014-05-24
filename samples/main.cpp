@@ -228,6 +228,7 @@ int main(int argc, char * argv[])
     types.BindField("x", &Character::x);
     types.BindField("y", &Character::y);
     types.BindField("hp", &Character::hp);
+    types.BindDefaultConstructor<Character>();
 
     editor.nodes.push_back(Node(100, 100, types, Character()));
     editor.nodes.push_back(Node(100, 200, types, 2));
@@ -247,6 +248,7 @@ int main(int argc, char * argv[])
     editor.nodes.push_back(Node(900, 600, types.GetFunction("heal")));
 
     editor.nodes.push_back(Node(300, 200, types.DeduceType<Character>()));
+    editor.nodes.push_back(Node(300, 400, types.DeduceType<Character>(), 1));
 
     glutInit(&argc, argv);
     glutInitWindowSize(1280, 720);
