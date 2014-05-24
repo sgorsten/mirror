@@ -113,11 +113,12 @@ public:
         Type &                                          type;
     public:
                                                         ClassReflector(TypeLibrary & lib, Type & type)  : lib(lib), type(type) {}
-        template<class T> ClassReflector &              HasField(std::string name, T C::*field)         { type.fields.push_back({move(name), lib.DeduceVarType<T>(), [field](void * p) -> void * { return &(reinterpret_cast<C *>(p)->*field); }}); return *this; }
+        template<class T            > ClassReflector &  HasField(std::string name, T C::*field)         { type.fields.push_back({move(name), lib.DeduceVarType<T>(), [field](void * p) -> void * { return &(reinterpret_cast<C *>(p)->*field); }}); return *this; }
         template<class R, class... P> ClassReflector &  HasMethod(std::string name, R (C::*method)(P...)               ) { lib.functions.push_back(lib.BindWithSignature(move(name), [method](               C & c, P... p) { return (c.*method)(std::forward<P>(p)...); }, (R(*)(               C &, P...))nullptr)); return *this; }
         template<class R, class... P> ClassReflector &  HasMethod(std::string name, R (C::*method)(P...) const         ) { lib.functions.push_back(lib.BindWithSignature(move(name), [method](const          C & c, P... p) { return (c.*method)(std::forward<P>(p)...); }, (R(*)(const          C &, P...))nullptr)); return *this; }
         template<class R, class... P> ClassReflector &  HasMethod(std::string name, R (C::*method)(P...)       volatile) { lib.functions.push_back(lib.BindWithSignature(move(name), [method](      volatile C & c, P... p) { return (c.*method)(std::forward<P>(p)...); }, (R(*)(      volatile C &, P...))nullptr)); return *this; }
         template<class R, class... P> ClassReflector &  HasMethod(std::string name, R (C::*method)(P...) const volatile) { lib.functions.push_back(lib.BindWithSignature(move(name), [method](const volatile C & c, P... p) { return (c.*method)(std::forward<P>(p)...); }, (R(*)(const volatile C &, P...))nullptr)); return *this; }
+        template<         class... P> ClassReflector &  HasConstructor()                                                 { lib.functions.push_back(lib.BindWithSignature(type.className,                         [](P... p) { return           C(std::forward<P>(p)...); }, (C(*)(                    P...))nullptr)); return *this; }
     };
 
     const std::vector<Function> &       GetAllFunctions() const                             { return functions; }

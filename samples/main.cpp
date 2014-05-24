@@ -207,6 +207,7 @@ struct Character
     int hp;
 
     Character() : x(), y(), hp(100) {}
+    Character(int hp) : x(), y(), hp(hp) {}
 
     void move(float dx, float dy) { x+=dx; y+=dy; }
     void damage(int dmg) { hp -= dmg; }
@@ -228,7 +229,8 @@ int main(int argc, char * argv[])
         .HasField("hp", &Character::hp)
         .HasMethod("move", &Character::move)
         .HasMethod("damage", &Character::damage)
-        .HasMethod("heal", &Character::heal);
+        .HasMethod("heal", &Character::heal)
+        .HasConstructor<int>();
 
     editor.nodes.push_back(Node(100, 100, types, Character()));
     editor.nodes.push_back(Node(100, 200, types, 2));
@@ -249,6 +251,7 @@ int main(int argc, char * argv[])
 
     editor.nodes.push_back(Node(300, 200, types.DeduceType<Character>()));
     editor.nodes.push_back(Node(300, 400, types.DeduceType<Character>(), 1));
+    editor.nodes.push_back(Node(300, 600, types.GetFunction("Character")));
 
     glutInit(&argc, argv);
     glutInitWindowSize(1280, 720);
