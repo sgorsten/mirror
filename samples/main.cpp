@@ -145,6 +145,14 @@ void OnMouse(int button, int state, int x, int y)
     }
 }
 
+void OnKeyboard(unsigned char key, int x, int y)
+{
+    switch(key)
+    {
+    case 127: editor.DeleteSelection(); break;
+    }
+}
+
 void RenderText12(int x, int y, const std::string & text)
 {
     glRasterPos2i(x,y+12);
@@ -393,7 +401,7 @@ int main(int argc, char * argv[])
     glutPassiveMotionFunc(OnMotion);
     glutMotionFunc(OnMotion);
     glutMouseFunc(OnMouse);
-    //glutKeyboardFunc(OnKeyboard);
+    glutKeyboardFunc(OnKeyboard);
     glutMainLoop();
 
     return 0;

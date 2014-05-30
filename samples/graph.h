@@ -172,6 +172,9 @@ struct GraphEditor
 
     void RecomputeNode(Node & n);
     Feature GetFeature(int x, int y);
+
+    void DeleteNode(int index);
+    void DeleteSelection();
 };
 
 #endif

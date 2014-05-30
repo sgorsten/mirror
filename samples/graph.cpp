@@ -81,3 +81,26 @@ Feature GraphEditor::GetFeature(int x, int y)
 
     return {Feature::None};
 }
+
+void GraphEditor::DeleteNode(int index)
+{
+    for(auto & node : nodes)
+    {
+        for(auto & input : node.inputs)
+        {
+            if(input.nodeIndex > index) --input.nodeIndex;
+            else if(input.nodeIndex == index) input = {-1,-1};
+        }
+    }
+    nodes.erase(begin(nodes) + index);
+
+    clickedFeature = mouseOverFeature = {};
+}
+
+void GraphEditor::DeleteSelection()
+{
+    for(int i = nodes.size()-1; i>=0; --i)
+    {
+        if(nodes[i].selected) DeleteNode(i);
+    }
+}
