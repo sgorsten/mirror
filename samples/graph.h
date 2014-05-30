@@ -50,15 +50,6 @@ struct NodeType
         return n;
     }
 
-    static NodeType MakeVariableNode(const VarType & type)
-    {
-        NodeType n;
-        n.uniqueId = ToString() << "var:" << type;
-        n.label = "var";
-        n.outputs.push_back({"", type});
-        return n;
-    }
-
     static NodeType MakeSplitNode(const Type & type)
     {
         NodeType n;
@@ -98,17 +89,16 @@ struct NodeType
 
 struct Node
 {
-    struct Wire { int nodeIndex, pinIndex; };
+    struct Wire { int nodeIndex, pinIndex; std::string immediate; };
 
     int                                 x,y;
     const NodeType *                    nodeType;
     std::vector<Wire>                   inputs;
+
     std::vector<std::shared_ptr<void>>  outputValues;
     bool                                selected;
 
                                         Node() : x(), y(), selected() {}
-   template<class T>                    Node(int x, int y, TypeLibrary & types, T && value) : x(x), y(y), nodeType(new NodeType(NodeType::MakeVariableNode(types.DeduceVarType<T>()))), outputValues({std::make_shared<T>(std::move(value))}), selected() {}
-
                                         Node(int x, int y, const NodeType * type)           : x(x), y(y), nodeType(type), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()), selected() {}
 
     int                                 GetInputCount() const                               { return nodeType->GetInputCount(); }

@@ -149,6 +149,12 @@ void OnMouse(int button, int state, int x, int y)
 
 void OnKeyboard(unsigned char key, int x, int y)
 {
+    if(editor.clickedFeature.type == Feature::Input)
+    {
+        auto & im = editor.clickedFeature.node->inputs[editor.clickedFeature.pin].immediate;
+        if(isprint(key)) im.push_back(key);
+    }
+
     switch(key)
     {
     case 127: editor.DeleteSelection(); break;
@@ -168,7 +174,11 @@ void OnKeyboard(unsigned char key, int x, int y)
                 for(size_t j=0; j<n.inputs.size(); ++j)
                 {
                     if(j) std::cout << ",\n";
-                    if(n.inputs[j].nodeIndex == -1) std::cout << "      null";
+                    if(n.inputs[j].nodeIndex == -1)
+                    {
+                        if(n.inputs[j].immediate.empty()) std::cout << "      null";
+                        else std::cout << "      \"" << n.inputs[j].immediate << "\"";
+                    }
                     else std::cout << "      {\"node\":" << n.inputs[j].nodeIndex << ", \"pin\":" << n.inputs[j].pinIndex << "}";
                 }
                 std::cout << "\n    ]";
@@ -255,6 +265,12 @@ void OnDisplay()
                 auto & n2 = editor.nodes[n.inputs[i].nodeIndex];
                 auto pin = n.inputs[i].pinIndex;
                 std::string val = ToStr(*n2.GetOutputType(pin).type, n2.outputValues[pin].get());
+                RenderText12(rect.x0 - n.GetPinPadding() - GetStringWidth12(val), rect.y0, val);
+            }
+            else if(!n.inputs[i].immediate.empty())
+            {
+                std::string val = n.inputs[i].immediate;
+                glColor3f(0,1,1);
                 RenderText12(rect.x0 - n.GetPinPadding() - GetStringWidth12(val), rect.y0, val);
             }
         }
@@ -406,12 +422,6 @@ int main(int argc, char * argv[])
     }
     editor.nodeTypes.push_back(NodeType::MakeBuildNode(types.DeduceType<Character>()));
     editor.nodeTypes.push_back(NodeType::MakeSplitNode(types.DeduceType<Character>()));
-
-    editor.nodes.push_back(Node(100, 100, types, Character()));
-    editor.nodes.push_back(Node(100, 200, types, 2));
-    editor.nodes.push_back(Node(100, 300, types, 3));
-    editor.nodes.push_back(Node(100, 400, types, 4.1f));
-    editor.nodes.push_back(Node(100, 500, types, 7.2f));
 
     glutInit(&argc, argv);
     glutInitWindowSize(1280, 720);

@@ -37,13 +37,37 @@ void GraphEditor::ConnectPins(Feature a, Feature b)
 
 void GraphEditor::RecomputeNode(Node & n)
 {  
+    std::vector<std::shared_ptr<void>> immediates;
     void * args[8];
     for(size_t i=0; i<n.inputs.size(); ++i)
     {
         auto wire = n.inputs[i];
-        if(wire.nodeIndex < 0) return;
-        if(!nodes[wire.nodeIndex].outputValues[wire.pinIndex]) return;
-        args[i] = nodes[wire.nodeIndex].outputValues[wire.pinIndex].get();
+        if(wire.nodeIndex < 0)
+        {
+            if(wire.immediate.empty()) return;
+
+            auto type = n.GetInputType(i);
+            assert(type.indirection == VarType::None);
+            if(type.type->index == typeid(int))
+            {
+                std::istringstream ss(wire.immediate);
+                int value; if(!(ss >> value)) return;
+                immediates.push_back(std::make_shared<int>(value));
+            }
+            else if(type.type->index == typeid(float))
+            {
+                std::istringstream ss(wire.immediate);
+                float value; if(!(ss >> value)) return;
+                immediates.push_back(std::make_shared<float>(value));
+            }           
+            else return;
+            args[i] = immediates.back().get();
+        }
+        else
+        {
+            if(!nodes[wire.nodeIndex].outputValues[wire.pinIndex]) return;
+            args[i] = nodes[wire.nodeIndex].outputValues[wire.pinIndex].get();
+        }
     }
     n.outputValues = n.nodeType->Evaluate(args);
 }
