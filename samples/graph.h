@@ -106,6 +106,8 @@ struct Node
                                         Node(int x, int y, const Type & type, int)          : x(x), y(y), nodeType(std::make_shared<NodeType>(NodeType::MakeBuildNode(type))), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()) {}
     template<class T>                   Node(int x, int y, TypeLibrary & types, T && value) : x(x), y(y), nodeType(std::make_shared<NodeType>(NodeType::MakeVariableNode(types.DeduceVarType<T>()))), outputValues({std::make_shared<T>(std::move(value))}) {}
 
+                                        Node(int x, int y, std::shared_ptr<const NodeType> type) : x(x), y(y), nodeType(move(type)), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()) {}
+
     int                                 GetInputCount() const                               { return nodeType->GetInputCount(); }
     int                                 GetOutputCount() const                              { return nodeType->GetOutputCount(); }
     VarType                             GetInputType(size_t index) const                    { return nodeType->GetInputType(index); }
@@ -161,7 +163,10 @@ struct GraphEditor
     Feature mouseOverFeature;
     Feature clickedFeature;
 
-    GraphEditor() : mouseOverFeature(Feature{}), clickedFeature({}) {}
+    std::vector<std::shared_ptr<const NodeType>> nodeTypes;
+    bool creatingNewNode;
+
+    GraphEditor() : mouseOverFeature(Feature{}), clickedFeature({}), creatingNewNode() {}
 
     void ConnectPins(Feature a, Feature b);
 

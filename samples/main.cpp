@@ -9,7 +9,6 @@ int GetStringWidth12(const std::string & text)
     int w = 0;
     for(auto ch : text) w += glutBitmapWidth(GLUT_BITMAP_HELVETICA_12, ch);
     return w;
-
 }
 
 int GetStringWidth18(const std::string & text)
@@ -26,16 +25,23 @@ void OnIdle()
 
 void OnMotion(int x, int y)
 {
-    editor.mouseOverFeature = editor.GetFeature(x, y);
-
-    if(editor.clickedFeature.type == Feature::Body)
+    if(editor.creatingNewNode)
     {
-        editor.clickedFeature.node->x += x - editor.lastX;
-        editor.clickedFeature.node->y += y - editor.lastY;
-    }
 
-    editor.lastX = x;
-    editor.lastY = y;
+    }
+    else
+    {
+        editor.mouseOverFeature = editor.GetFeature(x, y);
+
+        if(editor.clickedFeature.type == Feature::Body)
+        {
+            editor.clickedFeature.node->x += x - editor.lastX;
+            editor.clickedFeature.node->y += y - editor.lastY;
+        }
+
+        editor.lastX = x;
+        editor.lastY = y;
+    }
 }
 
 void OnMouse(int button, int state, int x, int y)
@@ -45,12 +51,24 @@ void OnMouse(int button, int state, int x, int y)
     case GLUT_LEFT_BUTTON:
         if(state == GLUT_DOWN)
         {
-            editor.lastX = x;
-            editor.lastY = y;
-            editor.clickedFeature = editor.mouseOverFeature;
-            if(editor.clickedFeature.type == Feature::Input)
+            if(editor.creatingNewNode)
             {
-                editor.clickedFeature.node->inputs[editor.clickedFeature.pin] = {-1,-1};
+                int index = (y - editor.lastY) / 16;
+                if(index >= 0 && index < editor.nodeTypes.size())
+                {
+                    editor.nodes.push_back(Node(editor.lastX, editor.lastY, editor.nodeTypes[index]));
+                }
+                editor.creatingNewNode = false;
+            }
+            else
+            {
+                editor.lastX = x;
+                editor.lastY = y;
+                editor.clickedFeature = editor.mouseOverFeature;
+                if(editor.clickedFeature.type == Feature::Input)
+                {
+                    editor.clickedFeature.node->inputs[editor.clickedFeature.pin] = {-1,-1};
+                }
             }
         }
         else
@@ -60,9 +78,18 @@ void OnMouse(int button, int state, int x, int y)
         }
         break;
     case GLUT_RIGHT_BUTTON:
-        if(state == GLUT_DOWN && editor.mouseOverFeature.type != Feature::None)
+        if(state == GLUT_DOWN)
         {
-            editor.RecomputeNode(*editor.mouseOverFeature.node);
+            if(editor.mouseOverFeature.type == Feature::None)
+            {
+                editor.lastX = x;
+                editor.lastY = y;
+                editor.creatingNewNode = true;
+            }
+            else
+            {
+                editor.RecomputeNode(*editor.mouseOverFeature.node);
+            }
         }
         break;
     }
@@ -210,6 +237,19 @@ void OnDisplay()
         RenderText12(editor.lastX, editor.lastY-16, mouseOverText);
     }
 
+    if(editor.creatingNewNode)
+    {
+        int cursor = editor.lastY;
+        for(const auto & type : editor.nodeTypes)
+        {
+            std::ostringstream ss;
+            type->WriteLabel(ss);
+            glColor3f(1,1,1);
+            RenderText12(editor.lastX, cursor, ss.str());
+            cursor += 16;
+        }
+    }
+
     glPopMatrix();   
     glPopAttrib();
 
@@ -255,26 +295,18 @@ int main(int argc, char * argv[])
         .HasMethod(&Character::heal,   "heal",   {"hp"})
         .HasConstructor<int>({"hp"});
 
+    for(auto & func : types.GetAllFunctions())
+    {
+        editor.nodeTypes.push_back(std::make_shared<NodeType>(NodeType::MakeFunctionNode(func)));
+    }
+    editor.nodeTypes.push_back(std::make_shared<NodeType>(NodeType::MakeBuildNode(types.DeduceType<Character>())));
+    editor.nodeTypes.push_back(std::make_shared<NodeType>(NodeType::MakeSplitNode(types.DeduceType<Character>())));
+
     editor.nodes.push_back(Node(100, 100, types, Character()));
     editor.nodes.push_back(Node(100, 200, types, 2));
     editor.nodes.push_back(Node(100, 300, types, 3));
     editor.nodes.push_back(Node(100, 400, types, 4.1f));
     editor.nodes.push_back(Node(100, 500, types, 7.2f));
-
-    editor.nodes.push_back(Node(500, 100, types.GetFunction("neg")));
-    editor.nodes.push_back(Node(500, 200, types.GetFunction("add")));
-    editor.nodes.push_back(Node(500, 300, types.GetFunction("mul")));
-    editor.nodes.push_back(Node(500, 400, types.GetFunction("negf")));
-    editor.nodes.push_back(Node(500, 500, types.GetFunction("addf")));
-    editor.nodes.push_back(Node(500, 600, types.GetFunction("mulf")));
-
-    editor.nodes.push_back(Node(900, 400, types.GetFunction("move")));
-    editor.nodes.push_back(Node(900, 500, types.GetFunction("damage")));
-    editor.nodes.push_back(Node(900, 600, types.GetFunction("heal")));
-
-    editor.nodes.push_back(Node(300, 200, types.DeduceType<Character>()));
-    editor.nodes.push_back(Node(300, 400, types.DeduceType<Character>(), 1));
-    editor.nodes.push_back(Node(300, 600, types.GetFunction("Character")));
 
     glutInit(&argc, argv);
     glutInitWindowSize(1280, 720);
