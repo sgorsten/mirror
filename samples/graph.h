@@ -96,17 +96,15 @@ struct Node
     struct Wire { int nodeIndex, pinIndex; };
 
     int                                 x,y;
-    std::shared_ptr<const NodeType>     nodeType;
+    const NodeType *                    nodeType;
     std::vector<Wire>                   inputs;
     std::vector<std::shared_ptr<void>>  outputValues;
+    bool                                selected;
 
-                                        Node() : x(), y() {}
-                                        Node(int x, int y, const Function * function)       : x(x), y(y), nodeType(std::make_shared<NodeType>(NodeType::MakeFunctionNode(*function))), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()) {}
-                                        Node(int x, int y, const Type & type)               : x(x), y(y), nodeType(std::make_shared<NodeType>(NodeType::MakeSplitNode(type))), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()) {}
-                                        Node(int x, int y, const Type & type, int)          : x(x), y(y), nodeType(std::make_shared<NodeType>(NodeType::MakeBuildNode(type))), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()) {}
-    template<class T>                   Node(int x, int y, TypeLibrary & types, T && value) : x(x), y(y), nodeType(std::make_shared<NodeType>(NodeType::MakeVariableNode(types.DeduceVarType<T>()))), outputValues({std::make_shared<T>(std::move(value))}) {}
+                                        Node() : x(), y(), selected() {}
+   template<class T>                    Node(int x, int y, TypeLibrary & types, T && value) : x(x), y(y), nodeType(new NodeType(NodeType::MakeVariableNode(types.DeduceVarType<T>()))), outputValues({std::make_shared<T>(std::move(value))}), selected() {}
 
-                                        Node(int x, int y, std::shared_ptr<const NodeType> type) : x(x), y(y), nodeType(move(type)), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()) {}
+                                        Node(int x, int y, const NodeType * type)           : x(x), y(y), nodeType(type), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()), selected() {}
 
     int                                 GetInputCount() const                               { return nodeType->GetInputCount(); }
     int                                 GetOutputCount() const                              { return nodeType->GetOutputCount(); }
@@ -158,15 +156,17 @@ struct Feature
 struct GraphEditor
 {
     std::vector<Node> nodes;
+    bool clicked;
+    int clickedX, clickedY;
     int lastX, lastY;
 
     Feature mouseOverFeature;
     Feature clickedFeature;
 
-    std::vector<std::shared_ptr<const NodeType>> nodeTypes;
+    std::vector<NodeType> nodeTypes;
     bool creatingNewNode;
 
-    GraphEditor() : mouseOverFeature(Feature{}), clickedFeature({}), creatingNewNode() {}
+    GraphEditor() : clicked(), mouseOverFeature({}), clickedFeature({}), creatingNewNode() {}
 
     void ConnectPins(Feature a, Feature b);
 

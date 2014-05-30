@@ -35,8 +35,14 @@ void OnMotion(int x, int y)
 
         if(editor.clickedFeature.type == Feature::Body)
         {
-            editor.clickedFeature.node->x += x - editor.lastX;
-            editor.clickedFeature.node->y += y - editor.lastY;
+            for(auto & node : editor.nodes)
+            {
+                if(node.selected)
+                {
+                    node.x += x - editor.lastX;
+                    node.y += y - editor.lastY;
+                }
+            }
         }
 
         editor.lastX = x;
@@ -51,12 +57,16 @@ void OnMouse(int button, int state, int x, int y)
     case GLUT_LEFT_BUTTON:
         if(state == GLUT_DOWN)
         {
+            editor.clicked = true;
+            editor.clickedX = x;
+            editor.clickedY = y;
+
             if(editor.creatingNewNode)
             {
                 int index = (y - editor.lastY) / 16;
                 if(index >= 0 && index < editor.nodeTypes.size())
                 {
-                    editor.nodes.push_back(Node(editor.lastX, editor.lastY, editor.nodeTypes[index]));
+                    editor.nodes.push_back(Node(editor.lastX, editor.lastY, &editor.nodeTypes[index]));
                 }
                 editor.creatingNewNode = false;
             }
@@ -69,10 +79,50 @@ void OnMouse(int button, int state, int x, int y)
                 {
                     editor.clickedFeature.node->inputs[editor.clickedFeature.pin] = {-1,-1};
                 }
+
+                if(editor.clickedFeature.type != Feature::Body && (glutGetModifiers() & GLUT_ACTIVE_SHIFT) == 0)
+                {
+                    for(auto & n : editor.nodes) n.selected = false;
+                }
+
+                if(editor.clickedFeature.type == Feature::Body)
+                {
+                    if(glutGetModifiers() & GLUT_ACTIVE_CTRL)
+                    {
+                        editor.clickedFeature.node->selected = !editor.clickedFeature.node->selected;
+                    }
+                    else
+                    {
+                        if(!editor.clickedFeature.node->selected)
+                        {
+                            for(auto & n : editor.nodes) n.selected = false;
+                            editor.clickedFeature.node->selected = true;
+                        }
+                    }
+                }
             }
         }
         else
         {
+            editor.clicked = false;
+
+            if(editor.clickedFeature.type == Feature::None)
+            {
+                Rect selectRect = { editor.clickedX, editor.clickedY, x, y };
+                if(selectRect.x0 > selectRect.x1) std::swap(selectRect.x0, selectRect.x1);
+                if(selectRect.y0 > selectRect.y1) std::swap(selectRect.y0, selectRect.y1);
+      
+                for(auto & node : editor.nodes)
+                {
+                    auto nodeRect = node.GetNodeRect();
+                    if(nodeRect.x0 > selectRect.x1) continue;
+                    if(nodeRect.x1 < selectRect.x0) continue;
+                    if(nodeRect.y0 > selectRect.y1) continue;
+                    if(nodeRect.y1 < selectRect.y0) continue;
+                    node.selected = true;
+                }
+            }
+
             editor.ConnectPins(editor.clickedFeature, editor.mouseOverFeature);
             editor.clickedFeature = {};
         }
@@ -115,6 +165,19 @@ void OnDisplay()
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
     glOrtho(0, 1280, 720, 0, -1, 1);
+
+    glBegin(GL_QUADS);
+    glColor3f(1,1,0);
+    for(auto n : editor.nodes)
+    {
+        if(!n.selected) continue;
+        auto rect = n.GetNodeRect();
+        glVertex2i(rect.x0-4,rect.y0-4);
+        glVertex2i(rect.x1+4,rect.y0-4);
+        glVertex2i(rect.x1+4,rect.y1+4);
+        glVertex2i(rect.x0-4,rect.y1+4);
+    }
+    glEnd();
 
     // Draw node contents
     for(const auto & n : editor.nodes)
@@ -243,11 +306,22 @@ void OnDisplay()
         for(const auto & type : editor.nodeTypes)
         {
             std::ostringstream ss;
-            type->WriteLabel(ss);
+            type.WriteLabel(ss);
             glColor3f(1,1,1);
             RenderText12(editor.lastX, cursor, ss.str());
             cursor += 16;
         }
+    }
+    else if(editor.clicked && editor.clickedFeature.type == Feature::None)
+    {
+        glBegin(GL_LINE_STRIP);
+        glColor3f(0.5f,0.5f,0);
+        glVertex2i(editor.clickedX, editor.clickedY);
+        glVertex2i(editor.lastX, editor.clickedY);
+        glVertex2i(editor.lastX, editor.lastY);
+        glVertex2i(editor.clickedX, editor.lastY);
+        glVertex2i(editor.clickedX, editor.clickedY);
+        glEnd();
     }
 
     glPopMatrix();   
@@ -297,10 +371,10 @@ int main(int argc, char * argv[])
 
     for(auto & func : types.GetAllFunctions())
     {
-        editor.nodeTypes.push_back(std::make_shared<NodeType>(NodeType::MakeFunctionNode(func)));
+        editor.nodeTypes.push_back(NodeType::MakeFunctionNode(func));
     }
-    editor.nodeTypes.push_back(std::make_shared<NodeType>(NodeType::MakeBuildNode(types.DeduceType<Character>())));
-    editor.nodeTypes.push_back(std::make_shared<NodeType>(NodeType::MakeSplitNode(types.DeduceType<Character>())));
+    editor.nodeTypes.push_back(NodeType::MakeBuildNode(types.DeduceType<Character>()));
+    editor.nodeTypes.push_back(NodeType::MakeSplitNode(types.DeduceType<Character>()));
 
     editor.nodes.push_back(Node(100, 100, types, Character()));
     editor.nodes.push_back(Node(100, 200, types, 2));
