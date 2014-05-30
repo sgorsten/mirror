@@ -145,11 +145,38 @@ void OnMouse(int button, int state, int x, int y)
     }
 }
 
+#include <iostream>
+
 void OnKeyboard(unsigned char key, int x, int y)
 {
     switch(key)
     {
     case 127: editor.DeleteSelection(); break;
+    case 'p':
+        std::cout << "[\n";
+        for(size_t i=0; i<editor.nodes.size(); ++i)
+        {
+            const auto & n = editor.nodes[i];
+            if(i) std::cout << ",\n";
+            std::cout << "  {";
+            std::cout << "\n    \"x\":" << n.x;
+            std::cout << ",\n    \"y\":" << n.y;
+            std::cout << ",\n    \"id\":\"" << n.nodeType->GetUniqueId() << "\"";
+            if(!n.inputs.empty())
+            {
+                std::cout << ",\n    \"wires\":[\n";
+                for(size_t j=0; j<n.inputs.size(); ++j)
+                {
+                    if(j) std::cout << ",\n";
+                    if(n.inputs[j].nodeIndex == -1) std::cout << "      null";
+                    else std::cout << "      {\"node\":" << n.inputs[j].nodeIndex << ", \"pin\":" << n.inputs[j].pinIndex << "}";
+                }
+                std::cout << "\n    ]";
+            }
+            std::cout << "\n  }";
+        }
+        std::cout << "\n]";
+        break;
     }
 }
 
@@ -201,13 +228,11 @@ void OnDisplay()
 
         rect = n.GetContentsRect();
 
-        std::ostringstream ss;
-        n.nodeType->WriteLabel(ss);
-        auto label = ss.str();
+        const auto & label = n.nodeType->GetLabel();
         if(!label.empty())
         {
             glColor3f(1,1,1);
-            RenderText18(rect.x0, rect.y0, ss.str());
+            RenderText18(rect.x0, rect.y0, label);
             rect.y0 += n.GetLineSpacing();
         }
 
@@ -313,10 +338,8 @@ void OnDisplay()
         int cursor = editor.lastY;
         for(const auto & type : editor.nodeTypes)
         {
-            std::ostringstream ss;
-            type.WriteLabel(ss);
             glColor3f(1,1,1);
-            RenderText12(editor.lastX, cursor, ss.str());
+            RenderText12(editor.lastX, cursor, type.GetLabel());
             cursor += 16;
         }
     }

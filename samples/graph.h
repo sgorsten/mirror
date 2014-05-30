@@ -25,11 +25,12 @@ std::string ToStr(const Type & type, void * value);
 struct NodeType
 {
     struct Pin { std::string label; VarType type; };
-    std::string label;
+    std::string uniqueId, label;
     std::vector<Pin> inputs, outputs;
     std::function<std::vector<std::shared_ptr<void>>(void **)> eval;
 
-    void WriteLabel(std::ostream & out) const { out << label; }
+    const std::string & GetUniqueId() const { return uniqueId; }
+    const std::string & GetLabel() const { return label; }
     size_t GetInputCount() const { return inputs.size(); }
     size_t GetOutputCount() const { return outputs.size(); }
     VarType GetInputType(size_t index) const { return inputs[index].type; }
@@ -41,6 +42,7 @@ struct NodeType
     static NodeType MakeFunctionNode(const Function & function)
     {
         NodeType n;
+        n.uniqueId = ToString() << "func:" << function;
         n.label = function.GetName();
         for(size_t i=0; i<function.GetParamCount(); ++i) n.inputs.push_back({function.GetParamName(i), function.GetParamType(i)});
         n.outputs.push_back({"", function.GetReturnType()});
@@ -51,6 +53,7 @@ struct NodeType
     static NodeType MakeVariableNode(const VarType & type)
     {
         NodeType n;
+        n.uniqueId = ToString() << "var:" << type;
         n.label = "var";
         n.outputs.push_back({"", type});
         return n;
@@ -59,6 +62,7 @@ struct NodeType
     static NodeType MakeSplitNode(const Type & type)
     {
         NodeType n;
+        n.uniqueId = ToString() << "split:" << type;
         n.label = ToString() << "split " << type;
         n.inputs.push_back({"", {&type, false, false, VarType::LValueRef}});
         for(auto & f : type.fields) n.outputs.push_back({f.identifier, f.type});
@@ -74,6 +78,7 @@ struct NodeType
     static NodeType MakeBuildNode(const Type & type)
     {
         NodeType n;
+        n.uniqueId = ToString() << "build:" << type;
         n.label = ToString() << "build " << type;
         for(auto & f : type.fields) n.inputs.push_back({f.identifier, f.type});
         n.outputs.push_back({"", {&type, false, false, VarType::None}});
@@ -130,7 +135,7 @@ struct Node
     int                                 GetSizeY() const                                    { return std::max<int>({GetInputColumnSize(), GetContentsColumnSize(), GetOutputColumnSize()}); }
 
     int                                 GetInputColumnLabelWidth() const                    { int w=0; for(size_t i=0, n=GetInputCount(); i!=n; ++i) w = std::max(w, GetStringWidth12(GetInputLabel(i))); return w; }
-    int                                 GetContentsColumnWidth() const                      { std::ostringstream ss; nodeType->WriteLabel(ss); return GetStringWidth18(ss.str()); }
+    int                                 GetContentsColumnWidth() const                      { return GetStringWidth18(nodeType->GetLabel()); }
     int                                 GetOutputColumnLabelWidth() const                   { int w=0; for(size_t i=0, n=GetOutputCount(); i!=n; ++i) w = std::max(w, GetStringWidth12(GetOutputLabel(i))); return w; }
     int                                 GetSizeX() const                                    { return GetPinSpacing() * 2 + GetInputColumnLabelWidth() + GetContentsColumnWidth() + GetOutputColumnLabelWidth() + GetColumnPadding() * 2; }
 
