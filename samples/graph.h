@@ -45,7 +45,7 @@ struct NodeType
         n.uniqueId = ToString() << "func:" << function;
         n.label = function.GetName();
         for(size_t i=0; i<function.GetParamCount(); ++i) n.inputs.push_back({function.GetParamName(i), function.GetParamType(i)});
-        n.outputs.push_back({"", function.GetReturnType()});
+        if(function.GetReturnType().type->index != typeid(void)) n.outputs.push_back({"", function.GetReturnType()});
         n.eval = [&function](void ** inputs) { return std::vector<std::shared_ptr<void>>{function.Invoke(inputs)}; };
         return n;
     }
