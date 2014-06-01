@@ -210,6 +210,17 @@ struct Renderer
         for(auto ch : text) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ch);
     }
 
+    void DrawWireBox(int x0, int y0, int x1, int y1)
+    {
+        glBegin(GL_LINE_STRIP);
+        glVertex2i(x0,y0);
+        glVertex2i(x1,y0);
+        glVertex2i(x1,y1);
+        glVertex2i(x0,y1);
+        glVertex2i(x0,y0);
+        glEnd();
+    }
+
     void DrawRect(int x0, int y0, int x1, int y1)
     {
         glBegin(GL_QUADS);
@@ -406,7 +417,6 @@ void OnDisplay()
         std::string mouseOverText = ToString() << editor.mouseOverFeature.GetPinType();
 
         auto w = GetStringWidth12(mouseOverText);
-        glBegin(GL_QUADS);
         glColor3f(0,0,0);
         r.DrawRect(editor.lastPos.x, editor.lastPos.y-16, editor.lastPos.x+w, editor.lastPos.y);
         glEnd();
@@ -427,9 +437,8 @@ void OnDisplay()
     }
     else if(editor.clicked && editor.clickedFeature.type == Feature::None)
     {
-        glBegin(GL_LINE_STRIP);
         glColor3f(0.5f,0.5f,0);
-        r.DrawRect(editor.clickedPos.x, editor.clickedPos.y, editor.lastPos.x, editor.lastPos.y);
+        r.DrawWireBox(editor.clickedPos.x, editor.clickedPos.y, editor.lastPos.x, editor.lastPos.y);
         glEnd();
     }
 
