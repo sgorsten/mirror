@@ -39,14 +39,14 @@ void OnMotion(int x, int y)
             {
                 if(node.selected)
                 {
-                    node.position.x += x - editor.lastX;
-                    node.position.y += y - editor.lastY;
+                    node.position.x += x - editor.lastPos.x;
+                    node.position.y += y - editor.lastPos.y;
                 }
             }
         }
 
-        editor.lastX = x;
-        editor.lastY = y;
+        editor.lastPos.x = x;
+        editor.lastPos.y = y;
     }
 }
 
@@ -58,22 +58,22 @@ void OnMouse(int button, int state, int x, int y)
         if(state == GLUT_DOWN)
         {
             editor.clicked = true;
-            editor.clickedX = x;
-            editor.clickedY = y;
+            editor.clickedPos.x = x;
+            editor.clickedPos.y = y;
 
             if(editor.creatingNewNode)
             {
-                int index = (y - editor.lastY) / 16;
+                int index = (y - editor.lastPos.y) / 16;
                 if(index >= 0 && index < editor.nodeTypes.size())
                 {
-                    editor.nodes.push_back(Node(editor.lastX, editor.lastY, &editor.nodeTypes[index]));
+                    editor.nodes.push_back(Node(editor.lastPos.x, editor.lastPos.y, &editor.nodeTypes[index]));
                 }
                 editor.creatingNewNode = false;
             }
             else
             {
-                editor.lastX = x;
-                editor.lastY = y;
+                editor.lastPos.x = x;
+                editor.lastPos.y = y;
                 editor.clickedFeature = editor.mouseOverFeature;
                 if(editor.clickedFeature.type == Feature::Input)
                 {
@@ -108,7 +108,7 @@ void OnMouse(int button, int state, int x, int y)
 
             if(editor.clickedFeature.type == Feature::None)
             {
-                Rect selectRect = { editor.clickedX, editor.clickedY, x, y };
+                Rect selectRect = { editor.clickedPos.x, editor.clickedPos.y, x, y };
                 if(selectRect.x0 > selectRect.x1) std::swap(selectRect.x0, selectRect.x1);
                 if(selectRect.y0 > selectRect.y1) std::swap(selectRect.y0, selectRect.y1);
       
@@ -132,8 +132,8 @@ void OnMouse(int button, int state, int x, int y)
         {
             if(editor.mouseOverFeature.type == Feature::None)
             {
-                editor.lastX = x;
-                editor.lastY = y;
+                editor.lastPos.x = x;
+                editor.lastPos.y = y;
                 editor.creatingNewNode = true;
             }
             else
@@ -186,7 +186,7 @@ void OnKeyboard(unsigned char key, int x, int y)
             if(n.IsSequenced())
             {
                 std::cout << ",\n    \"next\":";
-                if(n.flowOutput) std::cout << (n.flowOutput - editor.nodes.data());
+                if(n.flowOutputIndex >= 0) std::cout << n.flowOutputIndex;
                 else std::cout << "null";
             }
             std::cout << "\n  }";
@@ -196,20 +196,48 @@ void OnKeyboard(unsigned char key, int x, int y)
     }
 }
 
-void RenderText12(int x, int y, const std::string & text)
+struct Renderer
 {
-    glRasterPos2i(x,y+12);
-    for(auto ch : text) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, ch);
-}
+    void DrawText12(int x, int y, const std::string & text)
+    {
+        glRasterPos2i(x,y+12);
+        for(auto ch : text) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, ch);
+    }
 
-void RenderText18(int x, int y, const std::string & text)
-{
-    glRasterPos2i(x,y+18);
-    for(auto ch : text) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ch);
-}
+    void DrawText18(int x, int y, const std::string & text)
+    {
+        glRasterPos2i(x,y+18);
+        for(auto ch : text) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ch);
+    }
+
+    void DrawRect(int x0, int y0, int x1, int y1)
+    {
+        glBegin(GL_QUADS);
+        glVertex2i(x0,y0);
+        glVertex2i(x1,y0);
+        glVertex2i(x1,y1);
+        glVertex2i(x0,y1);
+        glEnd();
+    }
+
+    void DrawRect(const Rect & r)
+    {
+        DrawRect(r.x0, r.y0, r.x1, r.y1);
+    }
+
+    void DrawLine(const int2 & a, const int2 & b)
+    {
+        glBegin(GL_LINES);
+        glVertex2i(a.x, a.y);
+        glVertex2i(b.x, b.y);
+        glEnd();
+    }
+};
 
 void OnDisplay()
-{  
+{
+    Renderer r;
+
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glPushAttrib(GL_ALL_ATTRIB_BITS);
@@ -217,30 +245,20 @@ void OnDisplay()
     glPushMatrix();
     glOrtho(0, 1280, 720, 0, -1, 1);
 
-    glBegin(GL_QUADS);
     glColor3f(1,1,0);
     for(auto n : editor.nodes)
     {
         if(!n.selected) continue;
         auto rect = n.GetNodeRect();
-        glVertex2i(rect.x0-4,rect.y0-4);
-        glVertex2i(rect.x1+4,rect.y0-4);
-        glVertex2i(rect.x1+4,rect.y1+4);
-        glVertex2i(rect.x0-4,rect.y1+4);
+        r.DrawRect(rect.x0-4, rect.y0-4, rect.x1+4, rect.y1+4);
     }
-    glEnd();
 
     // Draw node contents
     for(const auto & n : editor.nodes)
     {
         auto rect = n.GetNodeRect();
-        glBegin(GL_QUADS);
         glColor3f(0.3f,0.3f,0.3f);
-        glVertex2i(rect.x0,rect.y0);
-        glVertex2i(rect.x1,rect.y0);
-        glVertex2i(rect.x1,rect.y1);
-        glVertex2i(rect.x0,rect.y1);
-        glEnd();
+        r.DrawRect(rect);
 
         rect = n.GetContentsRect();
 
@@ -248,7 +266,7 @@ void OnDisplay()
         if(!label.empty())
         {
             glColor3f(1,1,1);
-            RenderText18(rect.x0, rect.y0, label);
+            r.DrawText18(rect.x0, rect.y0, label);
             rect.y0 += n.GetLineSpacing();
         }
 
@@ -284,72 +302,59 @@ void OnDisplay()
         for(size_t i=0; i<n.GetInputCount(); ++i)
         {
             rect = n.GetInputPinRect(i);
-            glBegin(GL_QUADS);
             if(editor.clickedFeature.type == Feature::Output && editor.clickedFeature.GetPinType().type == n.GetInputType(i).type) glColor3f(1,1,0);
             else glColor3f(0.5f,0.5f,0.5f);
+            r.DrawRect(rect);
             glVertex2i(rect.x0,rect.y0);
             glVertex2i(rect.x1,rect.y0);
             glVertex2i(rect.x1,rect.y1);
             glVertex2i(rect.x0,rect.y1);
-            glEnd();
 
             glColor3f(1,1,1);
-            RenderText12(rect.x1 + n.GetPinPadding(), rect.y0, n.GetInputLabel(i));
+            r.DrawText12(rect.x1 + n.GetPinPadding(), rect.y0, n.GetInputLabel(i));
             if(n.inputs[i].nodeIndex >= 0)
             {
                 auto & n2 = editor.nodes[n.inputs[i].nodeIndex];
                 auto pin = n.inputs[i].pinIndex;
                 std::string val = ToStr(*n2.GetOutputType(pin).type, n2.outputValues[pin].get());
-                RenderText12(rect.x0 - n.GetPinPadding() - GetStringWidth12(val), rect.y0, val);
+                r.DrawText12(rect.x0 - n.GetPinPadding() - GetStringWidth12(val), rect.y0, val);
             }
             else if(!n.inputs[i].immediate.empty())
             {
                 std::string val = n.inputs[i].immediate;
                 glColor3f(0,1,1);
-                RenderText12(rect.x0 - n.GetPinPadding() - GetStringWidth12(val), rect.y0, val);
+                r.DrawText12(rect.x0 - n.GetPinPadding() - GetStringWidth12(val), rect.y0, val);
             }
         }
 
         for(size_t i=0; i<n.GetOutputCount(); ++i)
         {
             rect = n.GetOutputPinRect(i);
-            glBegin(GL_QUADS);
             if(editor.clickedFeature.type == Feature::Input && editor.clickedFeature.GetPinType().type == n.GetOutputType(i).type) glColor3f(1,1,0);
             else glColor3f(0.5f,0.5f,0.5f);
-            glVertex2i(rect.x0,rect.y0);
-            glVertex2i(rect.x1,rect.y0);
-            glVertex2i(rect.x1,rect.y1);
-            glVertex2i(rect.x0,rect.y1);
-            glEnd();
+            r.DrawRect(rect);
 
             glColor3f(1,1,1);
             auto lbl = n.GetOutputLabel(i);
-            RenderText12(rect.x0 - n.GetPinPadding() - GetStringWidth12(lbl), rect.y0, lbl);
-            RenderText12(rect.x1 + n.GetPinPadding(), rect.y0, ToStr(*n.GetOutputType(i).type, n.outputValues[i].get()));
+            r.DrawText12(rect.x0 - n.GetPinPadding() - GetStringWidth12(lbl), rect.y0, lbl);
+            r.DrawText12(rect.x1 + n.GetPinPadding(), rect.y0, ToStr(*n.GetOutputType(i).type, n.outputValues[i].get()));
         }
     }
 
     // Draw wires
-    glBegin(GL_LINES);
     glColor3f(1,1,1);
     for(const auto & n : editor.nodes)
     {
-        if(n.IsSequenced() && n.flowOutput)
+        if(n.IsSequenced() && n.flowOutputIndex >= 0)
         {
-            auto a = n.GetFlowOutputRect();
-            auto b = n.flowOutput->GetFlowInputRect();
-            glVertex2f((a.x0+a.x1)*0.5f, (a.y0+a.y1)*0.5f);
-            glVertex2f((b.x0+b.x1)*0.5f, (b.y0+b.y1)*0.5f);            
+            r.DrawLine(n.GetFlowOutputRect().GetCenter(), editor.nodes[n.flowOutputIndex].GetFlowInputRect().GetCenter());
         }
         for(size_t i=0; i<n.inputs.size(); ++i)
         {
             auto wire = n.inputs[i];
             if(wire.nodeIndex >= 0 && wire.nodeIndex < editor.nodes.size())
             {
-                auto a = editor.nodes[wire.nodeIndex].GetOutputPinRect(wire.pinIndex);
-                auto b = n.GetInputPinRect(i);
-                glVertex2f((a.x0+a.x1)*0.5f, (a.y0+a.y1)*0.5f);
-                glVertex2f((b.x0+b.x1)*0.5f, (b.y0+b.y1)*0.5f);
+                r.DrawLine(editor.nodes[wire.nodeIndex].GetOutputPinRect(wire.pinIndex).GetCenter(), n.GetInputPinRect(i).GetCenter());
             }
         }
     }
@@ -358,38 +363,29 @@ void OnDisplay()
         if(editor.mouseOverFeature.type == Feature::FlowOutput) glColor3f(1,1,0);
         else glColor3f(0.5f,0.5f,0.5f);
 
-        auto a = editor.clickedFeature.node->GetFlowInputRect();
-        glVertex2f((a.x0+a.x1)*0.5f, (a.y0+a.y1)*0.5f);
-        glVertex2i(editor.lastX, editor.lastY);
+        r.DrawLine(editor.clickedFeature.node->GetFlowInputRect().GetCenter(), editor.lastPos);
     }
     if(editor.clickedFeature.type == Feature::FlowOutput)
     {
         if(editor.mouseOverFeature.type == Feature::FlowInput) glColor3f(1,1,0);
         else glColor3f(0.5f,0.5f,0.5f);
 
-        auto a = editor.clickedFeature.node->GetFlowOutputRect();
-        glVertex2f((a.x0+a.x1)*0.5f, (a.y0+a.y1)*0.5f);
-        glVertex2i(editor.lastX, editor.lastY);
+        r.DrawLine(editor.clickedFeature.node->GetFlowOutputRect().GetCenter(), editor.lastPos);
     }
     if(editor.clickedFeature.type == Feature::Input)
     {
         if(editor.mouseOverFeature.type == Feature::Output && editor.mouseOverFeature.GetPinType().type == editor.clickedFeature.GetPinType().type) glColor3f(1,1,0);
         else glColor3f(0.5f,0.5f,0.5f);
 
-        auto a = editor.clickedFeature.node->GetInputPinRect(editor.clickedFeature.pin);
-        glVertex2f((a.x0+a.x1)*0.5f, (a.y0+a.y1)*0.5f);
-        glVertex2i(editor.lastX, editor.lastY);
+        r.DrawLine(editor.clickedFeature.GetPinRect().GetCenter(), editor.lastPos);
     }
     if(editor.clickedFeature.type == Feature::Output)
     {
         if(editor.mouseOverFeature.type == Feature::Input && editor.clickedFeature.GetPinType().type == editor.mouseOverFeature.GetPinType().type) glColor3f(1,1,0);
         else glColor3f(0.5f,0.5f,0.5f);
 
-        auto a = editor.clickedFeature.node->GetOutputPinRect(editor.clickedFeature.pin);
-        glVertex2f((a.x0+a.x1)*0.5f, (a.y0+a.y1)*0.5f);
-        glVertex2i(editor.lastX, editor.lastY);
+        r.DrawLine(editor.clickedFeature.GetPinRect().GetCenter(), editor.lastPos);
     }
-    glEnd();
 
     std::string mouseOverText;
     if(editor.mouseOverFeature.IsPin())
@@ -399,23 +395,20 @@ void OnDisplay()
         auto w = GetStringWidth12(mouseOverText);
         glBegin(GL_QUADS);
         glColor3f(0,0,0);
-        glVertex2i(editor.lastX, editor.lastY);
-        glVertex2i(editor.lastX, editor.lastY-16);
-        glVertex2i(editor.lastX+w, editor.lastY-16);
-        glVertex2i(editor.lastX+w, editor.lastY);
+        r.DrawRect(editor.lastPos.x, editor.lastPos.y-16, editor.lastPos.x+w, editor.lastPos.y);
         glEnd();
 
         glColor3f(1,1,1);
-        RenderText12(editor.lastX, editor.lastY-16, mouseOverText);
+        r.DrawText12(editor.lastPos.x, editor.lastPos.y-16, mouseOverText);
     }
 
     if(editor.creatingNewNode)
     {
-        int cursor = editor.lastY;
+        int cursor = editor.lastPos.y;
         for(const auto & type : editor.nodeTypes)
         {
             glColor3f(1,1,1);
-            RenderText12(editor.lastX, cursor, type.GetLabel());
+            r.DrawText12(editor.lastPos.x, cursor, type.GetLabel());
             cursor += 16;
         }
     }
@@ -423,11 +416,7 @@ void OnDisplay()
     {
         glBegin(GL_LINE_STRIP);
         glColor3f(0.5f,0.5f,0);
-        glVertex2i(editor.clickedX, editor.clickedY);
-        glVertex2i(editor.lastX, editor.clickedY);
-        glVertex2i(editor.lastX, editor.lastY);
-        glVertex2i(editor.clickedX, editor.lastY);
-        glVertex2i(editor.clickedX, editor.clickedY);
+        r.DrawRect(editor.clickedPos.x, editor.clickedPos.y, editor.lastPos.x, editor.lastPos.y);
         glEnd();
     }
 

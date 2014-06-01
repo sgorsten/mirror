@@ -28,7 +28,7 @@ void GraphEditor::ConnectPins(Feature a, Feature b)
     if(b.type == Feature::FlowInput) std::swap(a, b);
     if(a.type == Feature::FlowInput && b.type == Feature::FlowOutput)
     {
-        b.node->flowOutput = a.node;
+        b.node->flowOutputIndex = a.node - nodes.data();
         return;
     }
 

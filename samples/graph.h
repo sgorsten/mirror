@@ -12,7 +12,11 @@ struct int2
     int2() : x(), y() {}
     int2(int x, int y) : x(x), y(y) {}
 };
-struct Rect { int x0,y0,x1,y1; };
+struct Rect 
+{
+    int x0,y0,x1,y1; 
+    int2 GetCenter() const { return int2((x0+x1)/2, (y0+y1)/2); }
+};
 
 class ToString
 {
@@ -102,13 +106,13 @@ struct Node
     int2                                position;
     const NodeType *                    nodeType;
     std::vector<Wire>                   inputs;
-    const Node *                        flowOutput;
+    int                                 flowOutputIndex;
 
     std::vector<std::shared_ptr<void>>  outputValues;
     bool                                selected;
 
-                                        Node()                                              : selected(), flowOutput() {}
-                                        Node(int x, int y, const NodeType * type)           : position(x,y), nodeType(type), inputs(GetInputCount(),{-1,-1}), flowOutput(), outputValues(GetOutputCount()), selected() {}
+                                        Node()                                              : selected(), flowOutputIndex(-1) {}
+                                        Node(int x, int y, const NodeType * type)           : position(x,y), nodeType(type), inputs(GetInputCount(),{-1,-1}), flowOutputIndex(-1), outputValues(GetOutputCount()), selected() {}
 
     int                                 GetInputCount() const                               { return nodeType->GetInputCount(); }
     int                                 GetOutputCount() const                              { return nodeType->GetOutputCount(); }
@@ -169,8 +173,8 @@ struct GraphEditor
 {
     std::vector<Node> nodes;
     bool clicked;
-    int clickedX, clickedY;
-    int lastX, lastY;
+    int2 clickedPos;
+    int2 lastPos;
 
     Feature mouseOverFeature;
     Feature clickedFeature;
