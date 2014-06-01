@@ -25,6 +25,13 @@ std::string ToStr(const Type & type, void * value)
 
 void GraphEditor::ConnectPins(Feature a, Feature b)
 {
+    if(b.type == Feature::FlowInput) std::swap(a, b);
+    if(a.type == Feature::FlowInput && b.type == Feature::FlowOutput)
+    {
+        b.node->flowOutput = a.node;
+        return;
+    }
+
     if(b.type == Feature::Input) std::swap(a, b);
     if(a.type == Feature::Input && b.type == Feature::Output)
     {
@@ -80,6 +87,21 @@ Feature GraphEditor::GetFeature(int x, int y)
         if(x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1)
         {
             mouseOverFeature.node = &n;
+
+            if(n.IsSequenced())
+            {
+                rect = n.GetFlowInputRect();
+                if(x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1)
+                {
+                    return {Feature::FlowInput, &n, 0};
+                }
+
+                rect = n.GetFlowOutputRect();
+                if(x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1)
+                {
+                    return {Feature::FlowOutput, &n, 0};
+                }
+            }
 
             for(size_t i=0; i<n.GetInputCount(); ++i)
             {

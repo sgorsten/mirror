@@ -183,6 +183,12 @@ void OnKeyboard(unsigned char key, int x, int y)
                 }
                 std::cout << "\n    ]";
             }
+            if(n.IsSequenced())
+            {
+                std::cout << ",\n    \"next\":";
+                if(n.flowOutput) std::cout << (n.flowOutput - editor.nodes.data());
+                else std::cout << "null";
+            }
             std::cout << "\n  }";
         }
         std::cout << "\n]";
@@ -246,6 +252,35 @@ void OnDisplay()
             rect.y0 += n.GetLineSpacing();
         }
 
+        if(n.IsSequenced())
+        {
+            rect = n.GetFlowInputRect();
+            int cx = (rect.x0 + rect.x1) / 2;
+            int cy = (rect.y0 + rect.y1) / 2;
+            glBegin(GL_TRIANGLE_FAN);
+            if(editor.clickedFeature.type == Feature::FlowOutput) glColor3f(1,1,0);
+            else glColor3f(0.5f,0.5f,0.5f);
+            glVertex2i(rect.x0, rect.y0);
+            glVertex2i(cx, rect.y0);
+            glVertex2i(rect.x1, cy);
+            glVertex2i(cx, rect.y1);
+            glVertex2i(rect.x0, rect.y1);
+            glEnd();            
+
+            rect = n.GetFlowOutputRect();
+            cx = (rect.x0 + rect.x1) / 2;
+            cy = (rect.y0 + rect.y1) / 2;
+            glBegin(GL_TRIANGLE_FAN);
+            if(editor.clickedFeature.type == Feature::FlowInput) glColor3f(1,1,0);
+            else glColor3f(0.5f,0.5f,0.5f);
+            glVertex2i(rect.x0, rect.y0);
+            glVertex2i(cx, rect.y0);
+            glVertex2i(rect.x1, cy);
+            glVertex2i(cx, rect.y1);
+            glVertex2i(rect.x0, rect.y1);
+            glEnd();            
+        }
+
         for(size_t i=0; i<n.GetInputCount(); ++i)
         {
             rect = n.GetInputPinRect(i);
@@ -299,6 +334,13 @@ void OnDisplay()
     glColor3f(1,1,1);
     for(const auto & n : editor.nodes)
     {
+        if(n.IsSequenced() && n.flowOutput)
+        {
+            auto a = n.GetFlowOutputRect();
+            auto b = n.flowOutput->GetFlowInputRect();
+            glVertex2f((a.x0+a.x1)*0.5f, (a.y0+a.y1)*0.5f);
+            glVertex2f((b.x0+b.x1)*0.5f, (b.y0+b.y1)*0.5f);            
+        }
         for(size_t i=0; i<n.inputs.size(); ++i)
         {
             auto wire = n.inputs[i];
@@ -310,6 +352,24 @@ void OnDisplay()
                 glVertex2f((b.x0+b.x1)*0.5f, (b.y0+b.y1)*0.5f);
             }
         }
+    }
+    if(editor.clickedFeature.type == Feature::FlowInput)
+    {
+        if(editor.mouseOverFeature.type == Feature::FlowOutput) glColor3f(1,1,0);
+        else glColor3f(0.5f,0.5f,0.5f);
+
+        auto a = editor.clickedFeature.node->GetFlowInputRect();
+        glVertex2f((a.x0+a.x1)*0.5f, (a.y0+a.y1)*0.5f);
+        glVertex2i(editor.lastX, editor.lastY);
+    }
+    if(editor.clickedFeature.type == Feature::FlowOutput)
+    {
+        if(editor.mouseOverFeature.type == Feature::FlowInput) glColor3f(1,1,0);
+        else glColor3f(0.5f,0.5f,0.5f);
+
+        auto a = editor.clickedFeature.node->GetFlowOutputRect();
+        glVertex2f((a.x0+a.x1)*0.5f, (a.y0+a.y1)*0.5f);
+        glVertex2i(editor.lastX, editor.lastY);
     }
     if(editor.clickedFeature.type == Feature::Input)
     {

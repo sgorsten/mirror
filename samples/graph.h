@@ -27,6 +27,7 @@ struct NodeType
     struct Pin { std::string label; VarType type; };
     std::string uniqueId, label;
     std::vector<Pin> inputs, outputs;
+    bool isSequenced;
     std::function<std::vector<std::shared_ptr<void>>(void **)> eval;
 
     const std::string & GetUniqueId() const { return uniqueId; }
@@ -41,18 +42,19 @@ struct NodeType
 
     static NodeType MakeFunctionNode(const Function & function)
     {
-        NodeType n;
+        NodeType n = {};
         n.uniqueId = ToString() << "func:" << function;
         n.label = function.GetName();
         for(size_t i=0; i<function.GetParamCount(); ++i) n.inputs.push_back({function.GetParamName(i), function.GetParamType(i)});
         if(function.GetReturnType().type->index != typeid(void)) n.outputs.push_back({"", function.GetReturnType()});
+        n.isSequenced = true;
         n.eval = [&function](void ** inputs) { return std::vector<std::shared_ptr<void>>{function.Invoke(inputs)}; };
         return n;
     }
 
     static NodeType MakeSplitNode(const Type & type)
     {
-        NodeType n;
+        NodeType n = {};
         n.uniqueId = ToString() << "split:" << type;
         n.label = ToString() << "split " << type;
         n.inputs.push_back({"", {&type, false, false, VarType::LValueRef}});
@@ -68,7 +70,7 @@ struct NodeType
 
     static NodeType MakeBuildNode(const Type & type)
     {
-        NodeType n;
+        NodeType n = {};
         n.uniqueId = ToString() << "build:" << type;
         n.label = ToString() << "build " << type;
         for(auto & f : type.fields) n.inputs.push_back({f.identifier, f.type});
@@ -94,12 +96,13 @@ struct Node
     int                                 x,y;
     const NodeType *                    nodeType;
     std::vector<Wire>                   inputs;
+    const Node *                        flowOutput;
 
     std::vector<std::shared_ptr<void>>  outputValues;
     bool                                selected;
 
-                                        Node() : x(), y(), selected() {}
-                                        Node(int x, int y, const NodeType * type)           : x(x), y(y), nodeType(type), inputs(GetInputCount(),{-1,-1}), outputValues(GetOutputCount()), selected() {}
+                                        Node()                                              : x(), y(), selected(), flowOutput() {}
+                                        Node(int x, int y, const NodeType * type)           : x(x), y(y), nodeType(type), inputs(GetInputCount(),{-1,-1}), flowOutput(), outputValues(GetOutputCount()), selected() {}
 
     int                                 GetInputCount() const                               { return nodeType->GetInputCount(); }
     int                                 GetOutputCount() const                              { return nodeType->GetOutputCount(); }
@@ -115,14 +118,20 @@ struct Node
     std::string                         GetInputLabel(size_t index) const                   { return nodeType->GetInputLabel(index); }
     std::string                         GetOutputLabel(size_t index) const                  { return nodeType->GetOutputLabel(index); }
 
+    bool                                IsSequenced() const                                 { return nodeType->isSequenced; }
+    int                                 GetFlowControlSize() const                          { return IsSequenced() ? GetPinSpacing() : 0; }
+    Rect                                GetFlowInputRect() const                            { return GetPinRect(x,y); }
+    Rect                                GetFlowOutputRect() const                           { return GetPinRect(x+GetSizeX()-GetPinSize(),y); }
+
     int                                 GetPinSpacing() const                               { return GetPinSize() + GetPinPadding(); }
     int                                 GetLineSpacing() const                              { return GetLineSize() + GetLinePadding(); }
     int                                 GetPinColumnSize(int pins) const                    { return pins>0 ? (GetPinSize() + GetPinSpacing()*(pins-1)) : 0; }
     int                                 GetLineColumnSize(int pins) const                   { return pins>0 ? (GetLineSize() + GetLineSpacing()*(pins-1)) : 0; }
     int                                 GetInputColumnSize() const                          { return GetPinColumnSize(GetInputCount()); }
-    int                                 GetContentsColumnSize() const                       { return GetLineColumnSize(2); }
+    int                                 GetContentsColumnSize() const                       { return GetLineColumnSize(1); }
     int                                 GetOutputColumnSize() const                         { return GetPinColumnSize(GetOutputCount()); }
-    int                                 GetSizeY() const                                    { return std::max<int>({GetInputColumnSize(), GetContentsColumnSize(), GetOutputColumnSize()}); }
+    int                                 GetInnerSizeY() const                               { return std::max<int>({GetInputColumnSize(), GetContentsColumnSize(), GetOutputColumnSize()}); }
+    int                                 GetSizeY() const                                    { return GetFlowControlSize() + GetInnerSizeY(); }
 
     int                                 GetInputColumnLabelWidth() const                    { int w=0; for(size_t i=0, n=GetInputCount(); i!=n; ++i) w = std::max(w, GetStringWidth12(GetInputLabel(i))); return w; }
     int                                 GetContentsColumnWidth() const                      { return GetStringWidth18(nodeType->GetLabel()); }
@@ -131,21 +140,23 @@ struct Node
 
     Rect                                GetNodeRect() const                                 { return {x,y,x+GetSizeX(),y+GetSizeY()}; }
     Rect                                GetPinRect(int x, int y) const                      { return {x,y,x+GetPinSize(),y+GetPinSize()}; }
-    Rect                                GetInputPinRect(size_t i) const                     { return GetPinRect(x, y + (GetSizeY()-GetInputColumnSize())/2 + (int)i*GetPinSpacing()); }
-    Rect                                GetOutputPinRect(size_t i) const                    { return GetPinRect(x+GetSizeX()-GetPinSize(), y + (GetSizeY()-GetOutputColumnSize())/2 + (int)i*GetPinSpacing()); }
+    Rect                                GetInputPinRect(size_t i) const                     { return GetPinRect(x, y + GetFlowControlSize() + (GetInnerSizeY()-GetInputColumnSize())/2 + (int)i*GetPinSpacing()); }
+    Rect                                GetOutputPinRect(size_t i) const                    { return GetPinRect(x+GetSizeX()-GetPinSize(), y + GetFlowControlSize() + (GetInnerSizeY()-GetOutputColumnSize())/2 + (int)i*GetPinSpacing()); }
     Rect                                GetContentsRect() const                             { auto x0 = x+GetPinSize()+GetInputColumnLabelWidth()+GetColumnPadding(); return {x0, y, x0+GetContentsColumnWidth(), y+GetSizeY()}; }
 };
 
 struct Feature
 {
-    enum                                Type                                                { None, Body, Input, Output };
+    enum                                Type                                                { None, Body, Input, Output, FlowInput, FlowOutput };
     Type                                type;       
     Node *                              node;
     size_t                              pin;
 
+    bool                                IsFlowPin() const                                   { return type == FlowInput || type == FlowOutput; }
     bool                                IsPin() const                                       { return type == Input || type == Output; }
     VarType                             GetPinType() const                                  { assert(IsPin()); return type == Input ? node->GetInputType(pin) : node->GetOutputType(pin); }
     Rect                                GetPinRect() const                                  { assert(IsPin()); return type == Input ? node->GetInputPinRect(pin) : node->GetOutputPinRect(pin); }
+    Rect                                GetFlowPinRect() const                              { assert(IsFlowPin()); return type == FlowInput ? node->GetFlowInputRect() : node->GetFlowOutputRect(); }
 };
 
 struct GraphEditor
