@@ -227,9 +227,17 @@ struct Renderer
 
     void DrawLine(const int2 & a, const int2 & b)
     {
-        glBegin(GL_LINES);
-        glVertex2i(a.x, a.y);
-        glVertex2i(b.x, b.y);
+        float x0 = a.x, y0 = a.y;
+        float x3 = b.x, y3 = b.y;
+        float x1 = (x0+x3)/2, y1 = y0;
+        float x2 = (x0+x3)/2, y2 = y3;
+
+        glBegin(GL_LINE_STRIP);
+        for(float i=0; i<=32; ++i)
+        {
+            float t = i/32, s = (1-t);
+            glVertex2f(x0*(s*s*s) + x1*(3*s*s*t) + x2*(3*s*t*t) + x3*(t*t*t), y0*(s*s*s) + y1*(3*s*s*t) + y2*(3*s*t*t) + y3*(t*t*t));
+        }
         glEnd();
     }
 };
@@ -305,10 +313,6 @@ void OnDisplay()
             if(editor.clickedFeature.type == Feature::Output && editor.clickedFeature.GetPinType().type == n.GetInputType(i).type) glColor3f(1,1,0);
             else glColor3f(0.5f,0.5f,0.5f);
             r.DrawRect(rect);
-            glVertex2i(rect.x0,rect.y0);
-            glVertex2i(rect.x1,rect.y0);
-            glVertex2i(rect.x1,rect.y1);
-            glVertex2i(rect.x0,rect.y1);
 
             glColor3f(1,1,1);
             r.DrawText12(rect.x1 + n.GetPinPadding(), rect.y0, n.GetInputLabel(i));
