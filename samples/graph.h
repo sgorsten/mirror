@@ -6,12 +6,23 @@
 #include <sstream>
 #include <algorithm>
 
-struct int2 
+template<class T> struct vec2
 { 
-    int x,y; 
-    int2() : x(), y() {}
-    int2(int x, int y) : x(x), y(y) {}
+    T x,y; 
+    vec2() : x(), y() {}
+    vec2(T x, T y) : x(x), y(y) {}
+    vec2 operator + (const vec2 & r) const { return {x+r.x, y+r.y}; }
+    vec2 operator - (const vec2 & r) const { return {x-r.x, y-r.y}; }
+    vec2 operator * (T r) const { return {x*r, y*r}; }
+    vec2 operator / (T r) const { return {x/r, y/r}; }
 };
+template<class T> T dot(const vec2<T> & a, const vec2<T> & b) { return a.x*b.x + a.y*b.y; }
+template<class T> T mag2(const vec2<T> & a) { return dot(a,a); }
+template<class T> T mag(const vec2<T> & a) { return std::sqrt(mag2(a)); }
+template<class T> vec2<T> norm(const vec2<T> & a) { return a/mag(a); }
+typedef vec2<int> int2;
+typedef vec2<float> float2;
+
 struct Rect 
 {
     int x0,y0,x1,y1; 

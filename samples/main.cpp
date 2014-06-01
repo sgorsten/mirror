@@ -227,16 +227,20 @@ struct Renderer
 
     void DrawLine(const int2 & a, const int2 & b)
     {
-        float x0 = a.x, y0 = a.y;
-        float x3 = b.x, y3 = b.y;
-        float x1 = (x0+x3)/2, y1 = y0;
-        float x2 = (x0+x3)/2, y2 = y3;
+        auto p0 = float2(a.x, a.y);
+        auto p3 = float2(b.x, b.y);
+        auto p1 = float2((p0.x+p3.x)/2, p0.y);
+        auto p2 = float2((p0.x+p3.x)/2, p3.y);
+        auto d01 = p1-p0, d12 = p2-p1, d23 = p3-p2;
 
-        glBegin(GL_LINE_STRIP);
+        glBegin(GL_TRIANGLE_STRIP);
         for(float i=0; i<=32; ++i)
         {
             float t = i/32, s = (1-t);
-            glVertex2f(x0*(s*s*s) + x1*(3*s*s*t) + x2*(3*s*t*t) + x3*(t*t*t), y0*(s*s*s) + y1*(3*s*s*t) + y2*(3*s*t*t) + y3*(t*t*t));
+            auto p = p0*(s*s*s) + p1*(3*s*s*t) + p2*(3*s*t*t) + p3*(t*t*t);
+            auto d = norm(d01*(3*s*s) + d12*(6*s*t) + d23*(3*t*t));
+            glVertex2f(p.x-d.y, p.y+d.x);
+            glVertex2f(p.x+d.y, p.y-d.x);
         }
         glEnd();
     }
@@ -253,6 +257,7 @@ void OnDisplay()
     glPushMatrix();
     glOrtho(0, 1280, 720, 0, -1, 1);
 
+    // Draw outlines for selected nodes
     glColor3f(1,1,0);
     for(auto n : editor.nodes)
     {
@@ -261,15 +266,63 @@ void OnDisplay()
         r.DrawRect(rect.x0-4, rect.y0-4, rect.x1+4, rect.y1+4);
     }
 
+    // Draw node backgrounds
+    glColor3f(0.3f,0.3f,0.3f);
+    for(const auto & n : editor.nodes)
+    {
+        r.DrawRect(n.GetNodeRect());
+    }
+
+    // Draw wires
+    glColor3f(1,1,1);
+    for(const auto & n : editor.nodes)
+    {
+        if(n.IsSequenced() && n.flowOutputIndex >= 0)
+        {
+            r.DrawLine(n.GetFlowOutputRect().GetCenter(), editor.nodes[n.flowOutputIndex].GetFlowInputRect().GetCenter());
+        }
+        for(size_t i=0; i<n.inputs.size(); ++i)
+        {
+            auto wire = n.inputs[i];
+            if(wire.nodeIndex >= 0 && wire.nodeIndex < editor.nodes.size())
+            {
+                r.DrawLine(editor.nodes[wire.nodeIndex].GetOutputPinRect(wire.pinIndex).GetCenter(), n.GetInputPinRect(i).GetCenter());
+            }
+        }
+    }
+    if(editor.clickedFeature.type == Feature::FlowInput)
+    {
+        if(editor.mouseOverFeature.type == Feature::FlowOutput) glColor3f(1,1,0);
+        else glColor3f(0.5f,0.5f,0.5f);
+
+        r.DrawLine(editor.clickedFeature.node->GetFlowInputRect().GetCenter(), editor.lastPos);
+    }
+    if(editor.clickedFeature.type == Feature::FlowOutput)
+    {
+        if(editor.mouseOverFeature.type == Feature::FlowInput) glColor3f(1,1,0);
+        else glColor3f(0.5f,0.5f,0.5f);
+
+        r.DrawLine(editor.clickedFeature.node->GetFlowOutputRect().GetCenter(), editor.lastPos);
+    }
+    if(editor.clickedFeature.type == Feature::Input)
+    {
+        if(editor.mouseOverFeature.type == Feature::Output && editor.mouseOverFeature.GetPinType().type == editor.clickedFeature.GetPinType().type) glColor3f(1,1,0);
+        else glColor3f(0.5f,0.5f,0.5f);
+
+        r.DrawLine(editor.clickedFeature.GetPinRect().GetCenter(), editor.lastPos);
+    }
+    if(editor.clickedFeature.type == Feature::Output)
+    {
+        if(editor.mouseOverFeature.type == Feature::Input && editor.clickedFeature.GetPinType().type == editor.mouseOverFeature.GetPinType().type) glColor3f(1,1,0);
+        else glColor3f(0.5f,0.5f,0.5f);
+
+        r.DrawLine(editor.clickedFeature.GetPinRect().GetCenter(), editor.lastPos);
+    }
+
     // Draw node contents
     for(const auto & n : editor.nodes)
     {
-        auto rect = n.GetNodeRect();
-        glColor3f(0.3f,0.3f,0.3f);
-        r.DrawRect(rect);
-
-        rect = n.GetContentsRect();
-
+        auto rect = n.GetContentsRect();
         const auto & label = n.nodeType->GetLabel();
         if(!label.empty())
         {
@@ -345,51 +398,7 @@ void OnDisplay()
         }
     }
 
-    // Draw wires
-    glColor3f(1,1,1);
-    for(const auto & n : editor.nodes)
-    {
-        if(n.IsSequenced() && n.flowOutputIndex >= 0)
-        {
-            r.DrawLine(n.GetFlowOutputRect().GetCenter(), editor.nodes[n.flowOutputIndex].GetFlowInputRect().GetCenter());
-        }
-        for(size_t i=0; i<n.inputs.size(); ++i)
-        {
-            auto wire = n.inputs[i];
-            if(wire.nodeIndex >= 0 && wire.nodeIndex < editor.nodes.size())
-            {
-                r.DrawLine(editor.nodes[wire.nodeIndex].GetOutputPinRect(wire.pinIndex).GetCenter(), n.GetInputPinRect(i).GetCenter());
-            }
-        }
-    }
-    if(editor.clickedFeature.type == Feature::FlowInput)
-    {
-        if(editor.mouseOverFeature.type == Feature::FlowOutput) glColor3f(1,1,0);
-        else glColor3f(0.5f,0.5f,0.5f);
-
-        r.DrawLine(editor.clickedFeature.node->GetFlowInputRect().GetCenter(), editor.lastPos);
-    }
-    if(editor.clickedFeature.type == Feature::FlowOutput)
-    {
-        if(editor.mouseOverFeature.type == Feature::FlowInput) glColor3f(1,1,0);
-        else glColor3f(0.5f,0.5f,0.5f);
-
-        r.DrawLine(editor.clickedFeature.node->GetFlowOutputRect().GetCenter(), editor.lastPos);
-    }
-    if(editor.clickedFeature.type == Feature::Input)
-    {
-        if(editor.mouseOverFeature.type == Feature::Output && editor.mouseOverFeature.GetPinType().type == editor.clickedFeature.GetPinType().type) glColor3f(1,1,0);
-        else glColor3f(0.5f,0.5f,0.5f);
-
-        r.DrawLine(editor.clickedFeature.GetPinRect().GetCenter(), editor.lastPos);
-    }
-    if(editor.clickedFeature.type == Feature::Output)
-    {
-        if(editor.mouseOverFeature.type == Feature::Input && editor.clickedFeature.GetPinType().type == editor.mouseOverFeature.GetPinType().type) glColor3f(1,1,0);
-        else glColor3f(0.5f,0.5f,0.5f);
-
-        r.DrawLine(editor.clickedFeature.GetPinRect().GetCenter(), editor.lastPos);
-    }
+    
 
     std::string mouseOverText;
     if(editor.mouseOverFeature.IsPin())
