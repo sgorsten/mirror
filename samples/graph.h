@@ -6,6 +6,12 @@
 #include <sstream>
 #include <algorithm>
 
+struct int2 
+{ 
+    int x,y; 
+    int2() : x(), y() {}
+    int2(int x, int y) : x(x), y(y) {}
+};
 struct Rect { int x0,y0,x1,y1; };
 
 class ToString
@@ -93,7 +99,7 @@ struct Node
 {
     struct Wire { int nodeIndex, pinIndex; std::string immediate; };
 
-    int                                 x,y;
+    int2                                position;
     const NodeType *                    nodeType;
     std::vector<Wire>                   inputs;
     const Node *                        flowOutput;
@@ -101,8 +107,8 @@ struct Node
     std::vector<std::shared_ptr<void>>  outputValues;
     bool                                selected;
 
-                                        Node()                                              : x(), y(), selected(), flowOutput() {}
-                                        Node(int x, int y, const NodeType * type)           : x(x), y(y), nodeType(type), inputs(GetInputCount(),{-1,-1}), flowOutput(), outputValues(GetOutputCount()), selected() {}
+                                        Node()                                              : selected(), flowOutput() {}
+                                        Node(int x, int y, const NodeType * type)           : position(x,y), nodeType(type), inputs(GetInputCount(),{-1,-1}), flowOutput(), outputValues(GetOutputCount()), selected() {}
 
     int                                 GetInputCount() const                               { return nodeType->GetInputCount(); }
     int                                 GetOutputCount() const                              { return nodeType->GetOutputCount(); }
@@ -120,8 +126,8 @@ struct Node
 
     bool                                IsSequenced() const                                 { return nodeType->isSequenced; }
     int                                 GetFlowControlSize() const                          { return IsSequenced() ? GetPinSpacing() : 0; }
-    Rect                                GetFlowInputRect() const                            { return GetPinRect(x,y); }
-    Rect                                GetFlowOutputRect() const                           { return GetPinRect(x+GetSizeX()-GetPinSize(),y); }
+    Rect                                GetFlowInputRect() const                            { return GetPinRect(position.x,position.y); }
+    Rect                                GetFlowOutputRect() const                           { return GetPinRect(position.x+GetSizeX()-GetPinSize(),position.y); }
 
     int                                 GetPinSpacing() const                               { return GetPinSize() + GetPinPadding(); }
     int                                 GetLineSpacing() const                              { return GetLineSize() + GetLinePadding(); }
@@ -138,11 +144,11 @@ struct Node
     int                                 GetOutputColumnLabelWidth() const                   { int w=0; for(size_t i=0, n=GetOutputCount(); i!=n; ++i) w = std::max(w, GetStringWidth12(GetOutputLabel(i))); return w; }
     int                                 GetSizeX() const                                    { return GetPinSpacing() * 2 + GetInputColumnLabelWidth() + GetContentsColumnWidth() + GetOutputColumnLabelWidth() + GetColumnPadding() * 2; }
 
-    Rect                                GetNodeRect() const                                 { return {x,y,x+GetSizeX(),y+GetSizeY()}; }
+    Rect                                GetNodeRect() const                                 { return {position.x,position.y,position.x+GetSizeX(),position.y+GetSizeY()}; }
     Rect                                GetPinRect(int x, int y) const                      { return {x,y,x+GetPinSize(),y+GetPinSize()}; }
-    Rect                                GetInputPinRect(size_t i) const                     { return GetPinRect(x, y + GetFlowControlSize() + (GetInnerSizeY()-GetInputColumnSize())/2 + (int)i*GetPinSpacing()); }
-    Rect                                GetOutputPinRect(size_t i) const                    { return GetPinRect(x+GetSizeX()-GetPinSize(), y + GetFlowControlSize() + (GetInnerSizeY()-GetOutputColumnSize())/2 + (int)i*GetPinSpacing()); }
-    Rect                                GetContentsRect() const                             { auto x0 = x+GetPinSize()+GetInputColumnLabelWidth()+GetColumnPadding(); return {x0, y, x0+GetContentsColumnWidth(), y+GetSizeY()}; }
+    Rect                                GetInputPinRect(size_t i) const                     { return GetPinRect(position.x, position.y + GetFlowControlSize() + (GetInnerSizeY()-GetInputColumnSize())/2 + (int)i*GetPinSpacing()); }
+    Rect                                GetOutputPinRect(size_t i) const                    { return GetPinRect(position.x+GetSizeX()-GetPinSize(), position.y + GetFlowControlSize() + (GetInnerSizeY()-GetOutputColumnSize())/2 + (int)i*GetPinSpacing()); }
+    Rect                                GetContentsRect() const                             { auto x0 = position.x+GetPinSize()+GetInputColumnLabelWidth()+GetColumnPadding(); return {x0, position.y, x0+GetContentsColumnWidth(), position.y+GetSizeY()}; }
 };
 
 struct Feature

@@ -39,8 +39,8 @@ void OnMotion(int x, int y)
             {
                 if(node.selected)
                 {
-                    node.x += x - editor.lastX;
-                    node.y += y - editor.lastY;
+                    node.position.x += x - editor.lastX;
+                    node.position.y += y - editor.lastY;
                 }
             }
         }
@@ -165,8 +165,8 @@ void OnKeyboard(unsigned char key, int x, int y)
             const auto & n = editor.nodes[i];
             if(i) std::cout << ",\n";
             std::cout << "  {";
-            std::cout << "\n    \"x\":" << n.x;
-            std::cout << ",\n    \"y\":" << n.y;
+            std::cout << "\n    \"x\":" << n.position.x;
+            std::cout << ",\n    \"y\":" << n.position.y;
             std::cout << ",\n    \"id\":\"" << n.nodeType->GetUniqueId() << "\"";
             if(!n.inputs.empty())
             {
