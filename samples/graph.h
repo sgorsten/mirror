@@ -8,13 +8,17 @@
 
 template<class T> struct vec2
 { 
-    T x,y; 
-    vec2() : x(), y() {}
-    vec2(T x, T y) : x(x), y(y) {}
-    vec2 operator + (const vec2 & r) const { return {x+r.x, y+r.y}; }
-    vec2 operator - (const vec2 & r) const { return {x-r.x, y-r.y}; }
-    vec2 operator * (T r) const { return {x*r, y*r}; }
-    vec2 operator / (T r) const { return {x/r, y/r}; }
+    T       x,y; 
+            vec2()                              : x(), y() {}
+            vec2(T x, T y)                      : x(x), y(y) {}
+    vec2    operator + (const vec2 & r) const   { return {x+r.x, y+r.y}; }
+    vec2    operator - (const vec2 & r) const   { return {x-r.x, y-r.y}; }
+    vec2    operator * (T r) const              { return {x*r, y*r}; }
+    vec2    operator / (T r) const              { return {x/r, y/r}; }
+    vec2 &  operator += (const vec2 & r)        { return *this = *this + r; }
+    vec2 &  operator -= (const vec2 & r)        { return *this = *this - r; }
+    vec2 &  operator *= (T r)                   { return *this = *this * r; }
+    vec2 &  operator /= (T r)                   { return *this = *this / r; }
 };
 template<class T> T dot(const vec2<T> & a, const vec2<T> & b) { return a.x*b.x + a.y*b.y; }
 template<class T> T mag2(const vec2<T> & a) { return dot(a,a); }
@@ -123,7 +127,7 @@ struct Node
     bool                                selected;
 
                                         Node()                                              : selected(), flowOutputIndex(-1) {}
-                                        Node(int x, int y, const NodeType * type)           : position(x,y), nodeType(type), inputs(GetInputCount(),{-1,-1}), flowOutputIndex(-1), outputValues(GetOutputCount()), selected() {}
+                                        Node(const int2 & position, const NodeType * type)  : position(position), nodeType(type), inputs(GetInputCount(),{-1,-1}), flowOutputIndex(-1), outputValues(GetOutputCount()), selected() {}
 
     int                                 GetInputCount() const                               { return nodeType->GetInputCount(); }
     int                                 GetOutputCount() const                              { return nodeType->GetOutputCount(); }
@@ -174,25 +178,29 @@ struct Feature
     size_t                              pin;
 
     bool                                IsFlowPin() const                                   { return type == FlowInput || type == FlowOutput; }
-    bool                                IsPin() const                                       { return type == Input || type == Output; }
-    VarType                             GetPinType() const                                  { assert(IsPin()); return type == Input ? node->GetInputType(pin) : node->GetOutputType(pin); }
+    bool                                IsDataPin() const                                   { return type == Input || type == Output; }
+    VarType                             GetPinType() const                                  { assert(IsDataPin()); return type == Input ? node->GetInputType(pin) : node->GetOutputType(pin); }
     Rect                                GetPinRect() const;
 };
 
 struct GraphEditor
 {
+    std::vector<NodeType> nodeTypes;
     std::vector<Node> nodes;
-    bool clicked;
-    int2 clickedPos;
-    int2 lastPos;
 
+    
+
+    enum Mode { None, Dragging, NewNodePopup };
+
+    Mode mode;
     Feature mouseOverFeature;
     Feature clickedFeature;
 
-    std::vector<NodeType> nodeTypes;
-    bool creatingNewNode;
+    int2 clickedPos;                    // If the left mouse button is down, the location where it was clicked
+    int2 lastPos;
+    int2 menuPos;                       // If a context menu has been opened, the location of the mouse when it was opened    
 
-    GraphEditor() : clicked(), mouseOverFeature({}), clickedFeature({}), creatingNewNode() {}
+    GraphEditor() : mode(None), mouseOverFeature({}), clickedFeature({}) {}
 
     bool IsAssignable(const VarType & source, const VarType & target) const;
     bool IsCompatible(const Feature & a, const Feature & b) const;

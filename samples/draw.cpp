@@ -107,7 +107,7 @@ void GraphEditor::Draw() const
             }
         }
     }
-    if(clickedFeature.IsPin() || clickedFeature.IsFlowPin())
+    if(clickedFeature.IsDataPin() || clickedFeature.IsFlowPin())
     {
         if(IsCompatible(clickedFeature, mouseOverFeature)) glColor3f(1,1,0);
         else glColor3f(0.5f,0.5f,0.5f);
@@ -158,7 +158,7 @@ void GraphEditor::Draw() const
         for(size_t i=0; i<n.GetInputCount(); ++i)
         {
             rect = n.GetInputPinRect(i);
-            if(clickedFeature.type == Feature::Output && clickedFeature.GetPinType().type == n.GetInputType(i).type) glColor3f(1,1,0);
+            if(clickedFeature.type == Feature::Output && IsAssignable(clickedFeature.GetPinType(), n.GetInputType(i))) glColor3f(1,1,0);
             else glColor3f(0.5f,0.5f,0.5f);
             r.DrawRect(rect);
 
@@ -182,7 +182,7 @@ void GraphEditor::Draw() const
         for(size_t i=0; i<n.GetOutputCount(); ++i)
         {
             rect = n.GetOutputPinRect(i);
-            if(clickedFeature.type == Feature::Input && clickedFeature.GetPinType().type == n.GetOutputType(i).type) glColor3f(1,1,0);
+            if(clickedFeature.type == Feature::Input && IsAssignable(n.GetOutputType(i), clickedFeature.GetPinType())) glColor3f(1,1,0);
             else glColor3f(0.5f,0.5f,0.5f);
             r.DrawRect(rect);
 
@@ -193,10 +193,8 @@ void GraphEditor::Draw() const
         }
     }
 
-    
-
     std::string mouseOverText;
-    if(mouseOverFeature.IsPin())
+    if(mouseOverFeature.IsDataPin())
     {
         std::string mouseOverText = ToString() << mouseOverFeature.GetPinType();
 
@@ -209,21 +207,29 @@ void GraphEditor::Draw() const
         r.DrawText12(lastPos.x, lastPos.y-16, mouseOverText);
     }
 
-    if(creatingNewNode)
+    switch(mode)
     {
-        int cursor = lastPos.y;
-        for(const auto & type : nodeTypes)
+    case Dragging:
+        switch(clickedFeature.type)
         {
-            glColor3f(1,1,1);
-            r.DrawText12(lastPos.x, cursor, type.GetLabel());
-            cursor += 16;
+        case Feature::None: // Box selection
+            glColor3f(0.5f,0.5f,0);
+            r.DrawWireBox(clickedPos.x, clickedPos.y, lastPos.x, lastPos.y);
+            glEnd();
+            break;
         }
-    }
-    else if(clicked && clickedFeature.type == Feature::None)
-    {
-        glColor3f(0.5f,0.5f,0);
-        r.DrawWireBox(clickedPos.x, clickedPos.y, lastPos.x, lastPos.y);
-        glEnd();
+        break;
+    case NewNodePopup:
+        {
+            int cursor = menuPos.y;
+            for(const auto & type : nodeTypes)
+            {
+                glColor3f(1,1,1);
+                r.DrawText12(menuPos.x, cursor, type.GetLabel());
+                cursor += 16;
+            }
+        }
+        break;
     }
 
     glPopMatrix();   

@@ -25,28 +25,29 @@ void OnIdle()
 
 void OnMotion(int x, int y)
 {
-    if(editor.creatingNewNode)
-    {
+    int2 mousePos = {x,y}, delta = mousePos - editor.lastPos;
+    editor.lastPos = mousePos;
+    editor.mouseOverFeature = editor.GetFeature(x, y);
 
-    }
-    else
+    switch(editor.mode)
     {
-        editor.mouseOverFeature = editor.GetFeature(x, y);
-
-        if(editor.clickedFeature.type == Feature::Body)
+    case GraphEditor::NewNodePopup:
+        editor.mouseOverFeature = {};
+        break;
+    case GraphEditor::Dragging:
+        switch(editor.clickedFeature.type)
         {
+        case Feature::Body:
             for(auto & node : editor.nodes)
             {
                 if(node.selected)
                 {
-                    node.position.x += x - editor.lastPos.x;
-                    node.position.y += y - editor.lastPos.y;
+                    node.position += delta;
                 }
             }
+            break;
         }
-
-        editor.lastPos.x = x;
-        editor.lastPos.y = y;
+        break;
     }
 }
 
@@ -57,24 +58,23 @@ void OnMouse(int button, int state, int x, int y)
     case GLUT_LEFT_BUTTON:
         if(state == GLUT_DOWN)
         {
-            editor.clicked = true;
-            editor.clickedPos.x = x;
-            editor.clickedPos.y = y;
-
-            if(editor.creatingNewNode)
+            editor.clickedPos = {x,y};
+            switch(editor.mode)
             {
-                int index = (y - editor.lastPos.y) / 16;
-                if(index >= 0 && index < editor.nodeTypes.size())
+            case GraphEditor::NewNodePopup:
                 {
-                    editor.nodes.push_back(Node(editor.lastPos.x, editor.lastPos.y, &editor.nodeTypes[index]));
+                    int index = (y - editor.menuPos.y) / 16;
+                    if(index >= 0 && index < editor.nodeTypes.size())
+                    {
+                        editor.nodes.push_back(Node(editor.menuPos, &editor.nodeTypes[index]));
+                    }
+                    editor.mode = GraphEditor::None;
                 }
-                editor.creatingNewNode = false;
-            }
-            else
-            {
-                editor.lastPos.x = x;
-                editor.lastPos.y = y;
+                break;
+            case GraphEditor::None:
+                editor.lastPos = editor.clickedPos;
                 editor.clickedFeature = editor.mouseOverFeature;
+                editor.mode = GraphEditor::Dragging;
                 if(editor.clickedFeature.type == Feature::Input)
                 {
                     editor.clickedFeature.node->inputs[editor.clickedFeature.pin] = {-1,-1};
@@ -100,30 +100,34 @@ void OnMouse(int button, int state, int x, int y)
                         }
                     }
                 }
+                break;
             }
         }
-        else
+        else // Mouse up
         {
-            editor.clicked = false;
-
-            if(editor.clickedFeature.type == Feature::None)
+            switch(editor.mode)
             {
-                Rect selectRect = { editor.clickedPos.x, editor.clickedPos.y, x, y };
-                if(selectRect.x0 > selectRect.x1) std::swap(selectRect.x0, selectRect.x1);
-                if(selectRect.y0 > selectRect.y1) std::swap(selectRect.y0, selectRect.y1);
-      
-                for(auto & node : editor.nodes)
+            case GraphEditor::Dragging:
+                if(editor.clickedFeature.type == Feature::None) // Box selection
                 {
-                    auto nodeRect = node.GetNodeRect();
-                    if(nodeRect.x0 > selectRect.x1) continue;
-                    if(nodeRect.x1 < selectRect.x0) continue;
-                    if(nodeRect.y0 > selectRect.y1) continue;
-                    if(nodeRect.y1 < selectRect.y0) continue;
-                    node.selected = true;
+                    Rect selectRect = { editor.clickedPos.x, editor.clickedPos.y, x, y };
+                    if(selectRect.x0 > selectRect.x1) std::swap(selectRect.x0, selectRect.x1);
+                    if(selectRect.y0 > selectRect.y1) std::swap(selectRect.y0, selectRect.y1);
+      
+                    for(auto & node : editor.nodes)
+                    {
+                        auto nodeRect = node.GetNodeRect();
+                        if(nodeRect.x0 > selectRect.x1) continue;
+                        if(nodeRect.x1 < selectRect.x0) continue;
+                        if(nodeRect.y0 > selectRect.y1) continue;
+                        if(nodeRect.y1 < selectRect.y0) continue;
+                        node.selected = true;
+                    }
                 }
+                else editor.ConnectPins(editor.clickedFeature, editor.mouseOverFeature); // Wire connection
+                break;
             }
-
-            editor.ConnectPins(editor.clickedFeature, editor.mouseOverFeature);
+            editor.mode = GraphEditor::None;
             editor.clickedFeature = {};
         }
         break;
@@ -132,9 +136,8 @@ void OnMouse(int button, int state, int x, int y)
         {
             if(editor.mouseOverFeature.type == Feature::None)
             {
-                editor.lastPos.x = x;
-                editor.lastPos.y = y;
-                editor.creatingNewNode = true;
+                editor.menuPos = {x,y};
+                editor.mode = GraphEditor::NewNodePopup;
             }
             else
             {
