@@ -25,17 +25,16 @@ void OnIdle()
 
 void OnMotion(int x, int y)
 {
-    int2 mousePos = {x,y}, delta = mousePos - editor.lastPos;
-    editor.lastPos = mousePos;
-    editor.mouseOverFeature = editor.GetFeature(x, y);
+    int2 mousePos = {x,y}, delta = mousePos - editor.mouseover.coord;
+    editor.mouseover = editor.GetFeature(x, y);
 
     switch(editor.mode)
     {
     case GraphEditor::NewNodePopup:
-        editor.mouseOverFeature = {};
+        editor.mouseover = {};
         break;
     case GraphEditor::Dragging:
-        switch(editor.clickedFeature.type)
+        switch(editor.clicked.type)
         {
         case Feature::Body:
             for(auto & node : editor.nodes)
@@ -58,7 +57,6 @@ void OnMouse(int button, int state, int x, int y)
     case GLUT_LEFT_BUTTON:
         if(state == GLUT_DOWN)
         {
-            editor.clickedPos = {x,y};
             switch(editor.mode)
             {
             case GraphEditor::NewNodePopup:
@@ -72,31 +70,30 @@ void OnMouse(int button, int state, int x, int y)
                 }
                 break;
             case GraphEditor::None:
-                editor.lastPos = editor.clickedPos;
-                editor.clickedFeature = editor.mouseOverFeature;
+                editor.clicked = editor.mouseover;
                 editor.mode = GraphEditor::Dragging;
-                if(editor.clickedFeature.type == Feature::Input)
+                if(editor.clicked.type == Feature::Input)
                 {
-                    editor.clickedFeature.node->inputs[editor.clickedFeature.pin] = {-1,-1};
+                    editor.clicked.node->inputs[editor.clicked.pin] = {-1,-1};
                 }
 
-                if(editor.clickedFeature.type != Feature::Body && (glutGetModifiers() & GLUT_ACTIVE_SHIFT) == 0)
+                if(editor.clicked.type != Feature::Body && (glutGetModifiers() & GLUT_ACTIVE_SHIFT) == 0)
                 {
                     for(auto & n : editor.nodes) n.selected = false;
                 }
 
-                if(editor.clickedFeature.type == Feature::Body)
+                if(editor.clicked.type == Feature::Body)
                 {
                     if(glutGetModifiers() & GLUT_ACTIVE_CTRL)
                     {
-                        editor.clickedFeature.node->selected = !editor.clickedFeature.node->selected;
+                        editor.clicked.node->selected = !editor.clicked.node->selected;
                     }
                     else
                     {
-                        if(!editor.clickedFeature.node->selected)
+                        if(!editor.clicked.node->selected)
                         {
                             for(auto & n : editor.nodes) n.selected = false;
-                            editor.clickedFeature.node->selected = true;
+                            editor.clicked.node->selected = true;
                         }
                     }
                 }
@@ -108,9 +105,9 @@ void OnMouse(int button, int state, int x, int y)
             switch(editor.mode)
             {
             case GraphEditor::Dragging:
-                if(editor.clickedFeature.type == Feature::None) // Box selection
+                if(editor.clicked.type == Feature::None) // Box selection
                 {
-                    Rect selectRect = { editor.clickedPos.x, editor.clickedPos.y, x, y };
+                    Rect selectRect = { editor.clicked.coord.x, editor.clicked.coord.y, x, y };
                     if(selectRect.x0 > selectRect.x1) std::swap(selectRect.x0, selectRect.x1);
                     if(selectRect.y0 > selectRect.y1) std::swap(selectRect.y0, selectRect.y1);
       
@@ -124,24 +121,24 @@ void OnMouse(int button, int state, int x, int y)
                         node.selected = true;
                     }
                 }
-                else editor.ConnectPins(editor.clickedFeature, editor.mouseOverFeature); // Wire connection
+                else editor.ConnectPins(editor.clicked, editor.mouseover); // Wire connection
                 break;
             }
             editor.mode = GraphEditor::None;
-            editor.clickedFeature = {};
+            editor.clicked = {};
         }
         break;
     case GLUT_RIGHT_BUTTON:
         if(state == GLUT_DOWN)
         {
-            if(editor.mouseOverFeature.type == Feature::None)
+            if(editor.mouseover.type == Feature::None)
             {
                 editor.menuPos = {x,y};
                 editor.mode = GraphEditor::NewNodePopup;
             }
             else
             {
-                editor.RecomputeNode(*editor.mouseOverFeature.node);
+                editor.RecomputeNode(*editor.mouseover.node);
             }
         }
         break;
@@ -152,9 +149,9 @@ void OnMouse(int button, int state, int x, int y)
 
 void OnKeyboard(unsigned char key, int x, int y)
 {
-    if(editor.clickedFeature.type == Feature::Input)
+    if(editor.clicked.type == Feature::Input)
     {
-        auto & im = editor.clickedFeature.node->inputs[editor.clickedFeature.pin].immediate;
+        auto & im = editor.clicked.node->inputs[editor.clicked.pin].immediate;
         if(isprint(key)) im.push_back(key);
     }
 

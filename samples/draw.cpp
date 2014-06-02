@@ -107,11 +107,11 @@ void GraphEditor::Draw() const
             }
         }
     }
-    if(clickedFeature.IsDataPin() || clickedFeature.IsFlowPin())
+    if(clicked.IsDataPin() || clicked.IsFlowPin())
     {
-        if(IsCompatible(clickedFeature, mouseOverFeature)) glColor3f(1,1,0);
+        if(IsCompatible(clicked, mouseover)) glColor3f(1,1,0);
         else glColor3f(0.5f,0.5f,0.5f);
-        r.DrawLine(clickedFeature.GetPinRect().GetCenter(), lastPos);
+        r.DrawLine(clicked.GetPinRect().GetCenter(), mouseover.coord);
     }
 
     // Draw node contents
@@ -132,7 +132,7 @@ void GraphEditor::Draw() const
             int cx = (rect.x0 + rect.x1) / 2;
             int cy = (rect.y0 + rect.y1) / 2;
             glBegin(GL_TRIANGLE_FAN);
-            if(clickedFeature.type == Feature::FlowOutput) glColor3f(1,1,0);
+            if(clicked.type == Feature::FlowOutput) glColor3f(1,1,0);
             else glColor3f(0.5f,0.5f,0.5f);
             glVertex2i(rect.x0, rect.y0);
             glVertex2i(cx, rect.y0);
@@ -145,7 +145,7 @@ void GraphEditor::Draw() const
             cx = (rect.x0 + rect.x1) / 2;
             cy = (rect.y0 + rect.y1) / 2;
             glBegin(GL_TRIANGLE_FAN);
-            if(clickedFeature.type == Feature::FlowInput) glColor3f(1,1,0);
+            if(clicked.type == Feature::FlowInput) glColor3f(1,1,0);
             else glColor3f(0.5f,0.5f,0.5f);
             glVertex2i(rect.x0, rect.y0);
             glVertex2i(cx, rect.y0);
@@ -158,7 +158,7 @@ void GraphEditor::Draw() const
         for(size_t i=0; i<n.GetInputCount(); ++i)
         {
             rect = n.GetInputPinRect(i);
-            if(clickedFeature.type == Feature::Output && IsAssignable(clickedFeature.GetPinType(), n.GetInputType(i))) glColor3f(1,1,0);
+            if(clicked.type == Feature::Output && IsAssignable(clicked.GetPinType(), n.GetInputType(i))) glColor3f(1,1,0);
             else glColor3f(0.5f,0.5f,0.5f);
             r.DrawRect(rect);
 
@@ -182,7 +182,7 @@ void GraphEditor::Draw() const
         for(size_t i=0; i<n.GetOutputCount(); ++i)
         {
             rect = n.GetOutputPinRect(i);
-            if(clickedFeature.type == Feature::Input && IsAssignable(n.GetOutputType(i), clickedFeature.GetPinType())) glColor3f(1,1,0);
+            if(clicked.type == Feature::Input && IsAssignable(n.GetOutputType(i), clicked.GetPinType())) glColor3f(1,1,0);
             else glColor3f(0.5f,0.5f,0.5f);
             r.DrawRect(rect);
 
@@ -194,27 +194,27 @@ void GraphEditor::Draw() const
     }
 
     std::string mouseOverText;
-    if(mouseOverFeature.IsDataPin())
+    if(mouseover.IsDataPin())
     {
-        std::string mouseOverText = ToString() << mouseOverFeature.GetPinType();
+        std::string mouseOverText = ToString() << mouseover.GetPinType();
 
         auto w = GetStringWidth12(mouseOverText);
         glColor3f(0,0,0);
-        r.DrawRect(lastPos.x, lastPos.y-16, lastPos.x+w, lastPos.y);
+        r.DrawRect(mouseover.coord.x, mouseover.coord.y-16, mouseover.coord.x+w, mouseover.coord.y);
         glEnd();
 
         glColor3f(1,1,1);
-        r.DrawText12(lastPos.x, lastPos.y-16, mouseOverText);
+        r.DrawText12(mouseover.coord.x, mouseover.coord.y-16, mouseOverText);
     }
 
     switch(mode)
     {
     case Dragging:
-        switch(clickedFeature.type)
+        switch(clicked.type)
         {
         case Feature::None: // Box selection
             glColor3f(0.5f,0.5f,0);
-            r.DrawWireBox(clickedPos.x, clickedPos.y, lastPos.x, lastPos.y);
+            r.DrawWireBox(clicked.coord.x, clicked.coord.y, mouseover.coord.x, mouseover.coord.y);
             glEnd();
             break;
         }

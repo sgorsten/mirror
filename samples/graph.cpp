@@ -116,20 +116,18 @@ Feature GraphEditor::GetFeature(int x, int y)
         auto rect = n.GetNodeRect();
         if(x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1)
         {
-            mouseOverFeature.node = &n;
-
             if(n.IsSequenced())
             {
                 rect = n.GetFlowInputRect();
                 if(x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1)
                 {
-                    return {Feature::FlowInput, &n, 0};
+                    return {{x,y}, Feature::FlowInput, &n, 0};
                 }
 
                 rect = n.GetFlowOutputRect();
                 if(x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1)
                 {
-                    return {Feature::FlowOutput, &n, 0};
+                    return {{x,y}, Feature::FlowOutput, &n, 0};
                 }
             }
 
@@ -138,7 +136,7 @@ Feature GraphEditor::GetFeature(int x, int y)
                 rect = n.GetInputPinRect(i);
                 if(x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1)
                 {
-                    return {Feature::Input, &n, i};
+                    return {{x,y}, Feature::Input, &n, i};
                 }
             }
 
@@ -147,21 +145,24 @@ Feature GraphEditor::GetFeature(int x, int y)
                 rect = n.GetOutputPinRect(i);
                 if(x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1)
                 {
-                    return {Feature::Output, &n, i};
+                    return {{x,y}, Feature::Output, &n, i};
                 }
             }
 
-            return {Feature::Body, &n};
+            return {{x,y}, Feature::Body, &n};
         }
     }
 
-    return {Feature::None};
+    return {{x,y}, Feature::None};
 }
 
 void GraphEditor::DeleteNode(int index)
 {
     for(auto & node : nodes)
     {
+        if(node.flowOutputIndex > index) --node.flowOutputIndex;
+        else if(node.flowOutputIndex == index) node.flowOutputIndex = -1;
+
         for(auto & input : node.inputs)
         {
             if(input.nodeIndex > index) --input.nodeIndex;
@@ -170,7 +171,7 @@ void GraphEditor::DeleteNode(int index)
     }
     nodes.erase(begin(nodes) + index);
 
-    clickedFeature = mouseOverFeature = {};
+    clicked = mouseover = {};
 }
 
 void GraphEditor::DeleteSelection()

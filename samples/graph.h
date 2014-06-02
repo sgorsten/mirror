@@ -173,7 +173,8 @@ struct Node
 struct Feature
 {
     enum                                Type                                                { None, Body, Input, Output, FlowInput, FlowOutput };
-    Type                                type;       
+    int2                                coord;                                              // Coordinates of the mouse when it was over this feature
+    Type                                type;
     Node *                              node;
     size_t                              pin;
 
@@ -191,16 +192,12 @@ struct GraphEditor
     
 
     enum Mode { None, Dragging, NewNodePopup };
+    Mode mode;              // What mode the editor is in
+    Feature mouseover;      // The current graph feature that the mouse is over
+    Feature clicked;        // (Dragging mode) The last graph feature that the mouse clicked
+    int2 menuPos;           // (NewNodePopup mode) If a context menu has been opened, the location of the mouse when it was opened    
 
-    Mode mode;
-    Feature mouseOverFeature;
-    Feature clickedFeature;
-
-    int2 clickedPos;                    // If the left mouse button is down, the location where it was clicked
-    int2 lastPos;
-    int2 menuPos;                       // If a context menu has been opened, the location of the mouse when it was opened    
-
-    GraphEditor() : mode(None), mouseOverFeature({}), clickedFeature({}) {}
+    GraphEditor() : mode(None), mouseover({}), clicked({}) {}
 
     bool IsAssignable(const VarType & source, const VarType & target) const;
     bool IsCompatible(const Feature & a, const Feature & b) const;
