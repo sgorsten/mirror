@@ -23,6 +23,36 @@ std::string ToStr(const Type & type, void * value)
     return ss.str();
 }
 
+Rect Feature::GetPinRect() const
+{
+    switch(type)
+    {
+    case Input: return node->GetInputPinRect(pin);
+    case Output: return node->GetOutputPinRect(pin);
+    case FlowInput: return node->GetFlowInputRect();
+    case FlowOutput: return node->GetFlowOutputRect();
+    default: assert(false); return {};
+    }
+}
+
+bool GraphEditor::IsAssignable(const VarType & source, const VarType & target) const
+{
+    // TODO: Const correctness, copyability, conversion to base, etc.
+    return source.type == target.type;    
+}
+
+bool GraphEditor::IsCompatible(const Feature & a, const Feature & b) const
+{
+    switch(a.type)
+    {
+    case Feature::FlowInput: return b.type == Feature::FlowOutput;
+    case Feature::FlowOutput: return b.type == Feature::FlowInput;
+    case Feature::Input: return b.type == Feature::Output && IsAssignable(b.node->GetOutputType(b.pin), a.node->GetInputType(a.pin));
+    case Feature::Output: return b.type == Feature::Input && IsAssignable(a.node->GetOutputType(a.pin), b.node->GetInputType(b.pin));
+    default: return false;
+    }
+}
+
 void GraphEditor::ConnectPins(Feature a, Feature b)
 {
     if(b.type == Feature::FlowInput) std::swap(a, b);

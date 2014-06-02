@@ -165,6 +165,7 @@
     <ClInclude Include="..\samples\graph.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\samples\draw.cpp" />
     <ClCompile Include="..\samples\graph.cpp" />
     <ClCompile Include="..\samples\main.cpp" />
   </ItemGroup>

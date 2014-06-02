@@ -176,8 +176,7 @@ struct Feature
     bool                                IsFlowPin() const                                   { return type == FlowInput || type == FlowOutput; }
     bool                                IsPin() const                                       { return type == Input || type == Output; }
     VarType                             GetPinType() const                                  { assert(IsPin()); return type == Input ? node->GetInputType(pin) : node->GetOutputType(pin); }
-    Rect                                GetPinRect() const                                  { assert(IsPin()); return type == Input ? node->GetInputPinRect(pin) : node->GetOutputPinRect(pin); }
-    Rect                                GetFlowPinRect() const                              { assert(IsFlowPin()); return type == FlowInput ? node->GetFlowInputRect() : node->GetFlowOutputRect(); }
+    Rect                                GetPinRect() const;
 };
 
 struct GraphEditor
@@ -195,6 +194,8 @@ struct GraphEditor
 
     GraphEditor() : clicked(), mouseOverFeature({}), clickedFeature({}), creatingNewNode() {}
 
+    bool IsAssignable(const VarType & source, const VarType & target) const;
+    bool IsCompatible(const Feature & a, const Feature & b) const;
     void ConnectPins(Feature a, Feature b);
 
     void RecomputeNode(Node & n);
@@ -202,6 +203,8 @@ struct GraphEditor
 
     void DeleteNode(int index);
     void DeleteSelection();
+
+    void Draw() const;
 };
 
 #endif
