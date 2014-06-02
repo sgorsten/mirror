@@ -109,51 +109,46 @@ void GraphEditor::RecomputeNode(Node & n)
     n.outputValues = n.nodeType->Evaluate(args);
 }
 
-Feature GraphEditor::GetFeature(int x, int y)
+Feature GraphEditor::GetFeature(const int2 & coord)
 {
     for(auto & n : nodes)
     {
-        auto rect = n.GetNodeRect();
-        if(x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1)
+        if(n.GetNodeRect().Contains(coord))
         {
             if(n.IsSequenced())
             {
-                rect = n.GetFlowInputRect();
-                if(x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1)
+                if(n.GetFlowInputRect().Contains(coord))
                 {
-                    return {{x,y}, Feature::FlowInput, &n, 0};
+                    return {coord, Feature::FlowInput, &n, 0};
                 }
 
-                rect = n.GetFlowOutputRect();
-                if(x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1)
+                if(n.GetFlowOutputRect().Contains(coord))
                 {
-                    return {{x,y}, Feature::FlowOutput, &n, 0};
+                    return {coord, Feature::FlowOutput, &n, 0};
                 }
             }
 
             for(size_t i=0; i<n.GetInputCount(); ++i)
             {
-                rect = n.GetInputPinRect(i);
-                if(x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1)
+                if(n.GetInputPinRect(i).Contains(coord))
                 {
-                    return {{x,y}, Feature::Input, &n, i};
+                    return {coord, Feature::Input, &n, i};
                 }
             }
 
             for(size_t i=0; i<n.GetOutputCount(); ++i)
             {
-                rect = n.GetOutputPinRect(i);
-                if(x >= rect.x0 && x < rect.x1 && y >= rect.y0 && y < rect.y1)
+                if(n.GetOutputPinRect(i).Contains(coord))
                 {
-                    return {{x,y}, Feature::Output, &n, i};
+                    return {coord, Feature::Output, &n, i};
                 }
             }
 
-            return {{x,y}, Feature::Body, &n};
+            return {coord, Feature::Body, &n};
         }
     }
 
-    return {{x,y}, Feature::None};
+    return {coord, Feature::None};
 }
 
 void GraphEditor::DeleteNode(int index)

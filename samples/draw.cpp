@@ -4,15 +4,15 @@
 
 struct Renderer
 {
-    void DrawText12(int x, int y, const std::string & text)
+    void DrawText12(const int2 & coord, const std::string & text)
     {
-        glRasterPos2i(x,y+12);
+        glRasterPos2i(coord.x, coord.y+12);
         for(auto ch : text) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, ch);
     }
 
-    void DrawText18(int x, int y, const std::string & text)
+    void DrawText18(const int2 & coord, const std::string & text)
     {
-        glRasterPos2i(x,y+18);
+        glRasterPos2i(coord.x, coord.y+18);
         for(auto ch : text) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ch);
     }
 
@@ -37,10 +37,7 @@ struct Renderer
         glEnd();
     }
 
-    void DrawRect(const Rect & r)
-    {
-        DrawRect(r.x0, r.y0, r.x1, r.y1);
-    }
+    void DrawRect(const Rect & r) { DrawRect(r.b0.x, r.b0.y, r.b1.x, r.b1.y); }
 
     void DrawLine(const int2 & a, const int2 & b)
     {
@@ -80,7 +77,7 @@ void GraphEditor::Draw() const
     {
         if(!n.selected) continue;
         auto rect = n.GetNodeRect();
-        r.DrawRect(rect.x0-4, rect.y0-4, rect.x1+4, rect.y1+4);
+        r.DrawRect(rect.b0.x-4, rect.b0.y-4, rect.b1.x+4, rect.b1.y+4);
     }
 
     // Draw node backgrounds
@@ -122,36 +119,34 @@ void GraphEditor::Draw() const
         if(!label.empty())
         {
             glColor3f(1,1,1);
-            r.DrawText18(rect.x0, rect.y0, label);
-            rect.y0 += n.GetLineSpacing();
+            r.DrawText18(rect.b0, label);
+            rect.b0.y += n.GetLineSpacing();
         }
 
         if(n.IsSequenced())
         {
             rect = n.GetFlowInputRect();
-            int cx = (rect.x0 + rect.x1) / 2;
-            int cy = (rect.y0 + rect.y1) / 2;
+            auto center = rect.GetCenter();
             glBegin(GL_TRIANGLE_FAN);
             if(clicked.type == Feature::FlowOutput) glColor3f(1,1,0);
             else glColor3f(0.5f,0.5f,0.5f);
-            glVertex2i(rect.x0, rect.y0);
-            glVertex2i(cx, rect.y0);
-            glVertex2i(rect.x1, cy);
-            glVertex2i(cx, rect.y1);
-            glVertex2i(rect.x0, rect.y1);
+            glVertex2i(rect.b0.x, rect.b0.y);
+            glVertex2i(center.x, rect.b0.y);
+            glVertex2i(rect.b1.x, center.y);
+            glVertex2i(center.x, rect.b1.y);
+            glVertex2i(rect.b0.x, rect.b1.y);
             glEnd();            
 
             rect = n.GetFlowOutputRect();
-            cx = (rect.x0 + rect.x1) / 2;
-            cy = (rect.y0 + rect.y1) / 2;
+            center = rect.GetCenter();
             glBegin(GL_TRIANGLE_FAN);
             if(clicked.type == Feature::FlowInput) glColor3f(1,1,0);
             else glColor3f(0.5f,0.5f,0.5f);
-            glVertex2i(rect.x0, rect.y0);
-            glVertex2i(cx, rect.y0);
-            glVertex2i(rect.x1, cy);
-            glVertex2i(cx, rect.y1);
-            glVertex2i(rect.x0, rect.y1);
+            glVertex2i(rect.b0.x, rect.b0.y);
+            glVertex2i(center.x, rect.b0.y);
+            glVertex2i(rect.b1.x, center.y);
+            glVertex2i(center.x, rect.b1.y);
+            glVertex2i(rect.b0.x, rect.b1.y);
             glEnd();            
         }
 
@@ -163,19 +158,19 @@ void GraphEditor::Draw() const
             r.DrawRect(rect);
 
             glColor3f(1,1,1);
-            r.DrawText12(rect.x1 + n.GetPinPadding(), rect.y0, n.GetInputLabel(i));
+            r.DrawText12({rect.b1.x + n.GetPinPadding(), rect.b0.y}, n.GetInputLabel(i));
             if(n.inputs[i].nodeIndex >= 0)
             {
                 auto & n2 = nodes[n.inputs[i].nodeIndex];
                 auto pin = n.inputs[i].pinIndex;
                 std::string val = ToStr(*n2.GetOutputType(pin).type, n2.outputValues[pin].get());
-                r.DrawText12(rect.x0 - n.GetPinPadding() - GetStringWidth12(val), rect.y0, val);
+                r.DrawText12(rect.b0 - int2(n.GetPinPadding() + GetStringWidth12(val), 0), val);
             }
             else if(!n.inputs[i].immediate.empty())
             {
                 std::string val = n.inputs[i].immediate;
                 glColor3f(0,1,1);
-                r.DrawText12(rect.x0 - n.GetPinPadding() - GetStringWidth12(val), rect.y0, val);
+                r.DrawText12(rect.b0 - int2(n.GetPinPadding() + GetStringWidth12(val), 0), val);
             }
         }
 
@@ -188,8 +183,8 @@ void GraphEditor::Draw() const
 
             glColor3f(1,1,1);
             auto lbl = n.GetOutputLabel(i);
-            r.DrawText12(rect.x0 - n.GetPinPadding() - GetStringWidth12(lbl), rect.y0, lbl);
-            r.DrawText12(rect.x1 + n.GetPinPadding(), rect.y0, ToStr(*n.GetOutputType(i).type, n.outputValues[i].get()));
+            r.DrawText12(rect.b0 - int2(n.GetPinPadding() + GetStringWidth12(lbl), 0), lbl);
+            r.DrawText12({rect.b1.x + n.GetPinPadding(), rect.b0.y}, ToStr(*n.GetOutputType(i).type, n.outputValues[i].get()));
         }
     }
 
@@ -204,7 +199,7 @@ void GraphEditor::Draw() const
         glEnd();
 
         glColor3f(1,1,1);
-        r.DrawText12(mouseover.coord.x, mouseover.coord.y-16, mouseOverText);
+        r.DrawText12(mouseover.coord - int2(0,16), mouseOverText);
     }
 
     switch(mode)
@@ -221,12 +216,12 @@ void GraphEditor::Draw() const
         break;
     case NewNodePopup:
         {
-            int cursor = menuPos.y;
+            auto cursor = menuPos;
             for(const auto & type : nodeTypes)
             {
                 glColor3f(1,1,1);
-                r.DrawText12(menuPos.x, cursor, type.GetLabel());
-                cursor += 16;
+                r.DrawText12(cursor, type.GetLabel());
+                cursor.y += 16;
             }
         }
         break;

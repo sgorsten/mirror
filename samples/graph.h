@@ -29,8 +29,9 @@ typedef vec2<float> float2;
 
 struct Rect 
 {
-    int x0,y0,x1,y1; 
-    int2 GetCenter() const { return int2((x0+x1)/2, (y0+y1)/2); }
+    int2 b0,b1;
+    int2 GetCenter() const { return (b0+b1)/2; }
+    bool Contains(const int2 & p) const { return p.x >= b0.x && p.y >= b0.y && p.x < b1.x && p.y < b1.y; }
 };
 
 class ToString
@@ -163,11 +164,11 @@ struct Node
     int                                 GetOutputColumnLabelWidth() const                   { int w=0; for(size_t i=0, n=GetOutputCount(); i!=n; ++i) w = std::max(w, GetStringWidth12(GetOutputLabel(i))); return w; }
     int                                 GetSizeX() const                                    { return GetPinSpacing() * 2 + GetInputColumnLabelWidth() + GetContentsColumnWidth() + GetOutputColumnLabelWidth() + GetColumnPadding() * 2; }
 
-    Rect                                GetNodeRect() const                                 { return {position.x,position.y,position.x+GetSizeX(),position.y+GetSizeY()}; }
-    Rect                                GetPinRect(int x, int y) const                      { return {x,y,x+GetPinSize(),y+GetPinSize()}; }
+    Rect                                GetNodeRect() const                                 { return {position, position + int2(GetSizeX(),GetSizeY())}; }
+    Rect                                GetPinRect(int x, int y) const                      { return {int2(x,y), int2(x,y) + int2(GetPinSize(),GetPinSize())}; }
     Rect                                GetInputPinRect(size_t i) const                     { return GetPinRect(position.x, position.y + GetFlowControlSize() + (GetInnerSizeY()-GetInputColumnSize())/2 + (int)i*GetPinSpacing()); }
     Rect                                GetOutputPinRect(size_t i) const                    { return GetPinRect(position.x+GetSizeX()-GetPinSize(), position.y + GetFlowControlSize() + (GetInnerSizeY()-GetOutputColumnSize())/2 + (int)i*GetPinSpacing()); }
-    Rect                                GetContentsRect() const                             { auto x0 = position.x+GetPinSize()+GetInputColumnLabelWidth()+GetColumnPadding(); return {x0, position.y, x0+GetContentsColumnWidth(), position.y+GetSizeY()}; }
+    Rect                                GetContentsRect() const                             { auto x0 = position.x+GetPinSize()+GetInputColumnLabelWidth()+GetColumnPadding(); return {int2(x0,position.y), int2(x0,position.y) + int2(GetContentsColumnWidth(),GetSizeY())}; }
 };
 
 struct Feature
@@ -204,7 +205,7 @@ struct GraphEditor
     void ConnectPins(Feature a, Feature b);
 
     void RecomputeNode(Node & n);
-    Feature GetFeature(int x, int y);
+    Feature GetFeature(const int2 & coord);
 
     void DeleteNode(int index);
     void DeleteSelection();

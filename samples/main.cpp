@@ -26,7 +26,7 @@ void OnIdle()
 void OnMotion(int x, int y)
 {
     int2 mousePos = {x,y}, delta = mousePos - editor.mouseover.coord;
-    editor.mouseover = editor.GetFeature(x, y);
+    editor.mouseover = editor.GetFeature(mousePos);
 
     switch(editor.mode)
     {
@@ -107,17 +107,17 @@ void OnMouse(int button, int state, int x, int y)
             case GraphEditor::Dragging:
                 if(editor.clicked.type == Feature::None) // Box selection
                 {
-                    Rect selectRect = { editor.clicked.coord.x, editor.clicked.coord.y, x, y };
-                    if(selectRect.x0 > selectRect.x1) std::swap(selectRect.x0, selectRect.x1);
-                    if(selectRect.y0 > selectRect.y1) std::swap(selectRect.y0, selectRect.y1);
+                    Rect selectRect = { editor.clicked.coord, {x,y} };
+                    if(selectRect.b0.x > selectRect.b1.x) std::swap(selectRect.b0.x, selectRect.b1.x);
+                    if(selectRect.b0.y > selectRect.b1.y) std::swap(selectRect.b0.y, selectRect.b1.y);
       
                     for(auto & node : editor.nodes)
                     {
                         auto nodeRect = node.GetNodeRect();
-                        if(nodeRect.x0 > selectRect.x1) continue;
-                        if(nodeRect.x1 < selectRect.x0) continue;
-                        if(nodeRect.y0 > selectRect.y1) continue;
-                        if(nodeRect.y1 < selectRect.y0) continue;
+                        if(nodeRect.b0.x > selectRect.b1.x) continue;
+                        if(nodeRect.b1.x < selectRect.b0.x) continue;
+                        if(nodeRect.b0.x > selectRect.b1.y) continue;
+                        if(nodeRect.b1.x < selectRect.b0.y) continue;
                         node.selected = true;
                     }
                 }
