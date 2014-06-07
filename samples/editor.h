@@ -3,6 +3,34 @@
 
 #include "graph.h"
 
+template<class T> struct vec2
+{ 
+    T       x,y; 
+            vec2()                              : x(), y() {}
+            vec2(T x, T y)                      : x(x), y(y) {}
+    vec2    operator + (const vec2 & r) const   { return {x+r.x, y+r.y}; }
+    vec2    operator - (const vec2 & r) const   { return {x-r.x, y-r.y}; }
+    vec2    operator * (T r) const              { return {x*r, y*r}; }
+    vec2    operator / (T r) const              { return {x/r, y/r}; }
+    vec2 &  operator += (const vec2 & r)        { return *this = *this + r; }
+    vec2 &  operator -= (const vec2 & r)        { return *this = *this - r; }
+    vec2 &  operator *= (T r)                   { return *this = *this * r; }
+    vec2 &  operator /= (T r)                   { return *this = *this / r; }
+};
+template<class T> T dot(const vec2<T> & a, const vec2<T> & b) { return a.x*b.x + a.y*b.y; }
+template<class T> T mag2(const vec2<T> & a) { return dot(a,a); }
+template<class T> T mag(const vec2<T> & a) { return std::sqrt(mag2(a)); }
+template<class T> vec2<T> norm(const vec2<T> & a) { return a/mag(a); }
+typedef vec2<int> int2;
+typedef vec2<float> float2;
+
+struct Rect 
+{
+    int2 b0,b1;
+    int2 GetCenter() const { return (b0+b1)/2; }
+    bool Contains(const int2 & p) const { return p.x >= b0.x && p.y >= b0.y && p.x < b1.x && p.y < b1.y; }
+};
+
 int GetStringWidth12(const std::string & text);
 int GetStringWidth18(const std::string & text);
 
@@ -12,7 +40,7 @@ struct NodeView
     NodeView(const Node & node) : node(node) {}
 
     const NodeType &                    GetNodeType() const                                 { return *node.nodeType; }
-    const int2 &                        GetPosition() const                                 { return node.position; }
+    const int2 &                        GetPosition() const                                 { return reinterpret_cast<const int2 &>(node.x); }
 
     int                                 GetInputCount() const                               { return GetNodeType().GetInputCount(); }
     int                                 GetOutputCount() const                              { return GetNodeType().GetOutputCount(); }
@@ -69,6 +97,9 @@ struct Feature
     VarType                             GetPinType() const                                  { assert(IsDataPin()); return type == Input ? node->nodeType->GetInputType(pin) : node->nodeType->GetOutputType(pin); }
     Rect                                GetPinRect() const;
 };
+
+void WriteValue(std::ostream & out, const Type & type, void * value);
+std::string ToStr(const Type & type, void * value);
 
 struct GraphEditor
 {

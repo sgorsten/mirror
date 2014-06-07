@@ -45,7 +45,8 @@ void OnMotion(int x, int y)
             {
                 if(node.selected)
                 {
-                    node.position += delta;
+                    node.x += delta.x;
+                    node.y += delta.y;
                 }
             }
             break;
@@ -68,7 +69,7 @@ void OnMouse(int button, int state, int x, int y)
                     int index = (y - editor.menuPos.y) / 16;
                     if(index >= 0 && index < editor.nodeTypes.size())
                     {
-                        editor.nodes.push_back(Node(editor.menuPos, &editor.nodeTypes[index]));
+                        editor.nodes.push_back(Node(editor.menuPos.x, editor.menuPos.y, editor.nodeTypes[index]));
                     }
                     editor.mode = GraphEditor::None;
                 }

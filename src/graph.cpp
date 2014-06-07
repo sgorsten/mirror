@@ -143,8 +143,8 @@ JsonValue SaveGraph(const std::vector<Node> & nodes)
     for(auto & node : nodes)
     {
         JsonObject jNode = {
-            {"x", node.position.x},
-            {"y", node.position.y},
+            {"x", node.x},
+            {"y", node.y},
             {"id", node.nodeType->GetUniqueId()}
         };       
 
@@ -173,11 +173,8 @@ std::vector<Node> LoadGraph(const std::vector<NodeType> & nodeTypes, const JsonV
     std::vector<Node> nodes;
     for(const auto & jNode : jGraph.array())
     {    
-        // Determine location and type id of node
-        const int2 position = { jNode["x"].number<int>(), jNode["y"].number<int>() };
-        const auto & id = jNode["id"].string();
-
         // Search for the correct node type
+        const auto & id = jNode["id"].string();
         const NodeType * nodeType = nullptr;
         for(auto & type : nodeTypes)
         {
@@ -190,7 +187,7 @@ std::vector<Node> LoadGraph(const std::vector<NodeType> & nodeTypes, const JsonV
         if(!nodeType) throw std::runtime_error("Unrecognized node type: "+id);
 
         // Create the node
-        nodes.push_back(Node(position, nodeType));
+        nodes.push_back(Node(jNode["x"].number<int>(), jNode["y"].number<int>(), *nodeType));
         auto & node = nodes.back();
 
         // Connect the wires

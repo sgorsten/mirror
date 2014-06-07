@@ -10,34 +10,6 @@
 #include <sstream>
 #include <algorithm>
 
-template<class T> struct vec2
-{ 
-    T       x,y; 
-            vec2()                              : x(), y() {}
-            vec2(T x, T y)                      : x(x), y(y) {}
-    vec2    operator + (const vec2 & r) const   { return {x+r.x, y+r.y}; }
-    vec2    operator - (const vec2 & r) const   { return {x-r.x, y-r.y}; }
-    vec2    operator * (T r) const              { return {x*r, y*r}; }
-    vec2    operator / (T r) const              { return {x/r, y/r}; }
-    vec2 &  operator += (const vec2 & r)        { return *this = *this + r; }
-    vec2 &  operator -= (const vec2 & r)        { return *this = *this - r; }
-    vec2 &  operator *= (T r)                   { return *this = *this * r; }
-    vec2 &  operator /= (T r)                   { return *this = *this / r; }
-};
-template<class T> T dot(const vec2<T> & a, const vec2<T> & b) { return a.x*b.x + a.y*b.y; }
-template<class T> T mag2(const vec2<T> & a) { return dot(a,a); }
-template<class T> T mag(const vec2<T> & a) { return std::sqrt(mag2(a)); }
-template<class T> vec2<T> norm(const vec2<T> & a) { return a/mag(a); }
-typedef vec2<int> int2;
-typedef vec2<float> float2;
-
-struct Rect 
-{
-    int2 b0,b1;
-    int2 GetCenter() const { return (b0+b1)/2; }
-    bool Contains(const int2 & p) const { return p.x >= b0.x && p.y >= b0.y && p.x < b1.x && p.y < b1.y; }
-};
-
 class ToString
 {
     std::ostringstream ss;
@@ -45,9 +17,6 @@ public:
     operator std::string() const { return ss.str(); }
     template<class T> ToString & operator << (const T & val) { ss << val; return *this; }
 };
-
-void WriteValue(std::ostream & out, const Type & type, void * value);
-std::string ToStr(const Type & type, void * value);
 
 struct NodeType
 {
@@ -129,17 +98,21 @@ struct NodeType
 
 struct Node
 {
-    struct Wire { int nodeIndex, pinIndex; std::string immediate; };
+    struct Wire
+    {
+        int             nodeIndex, pinIndex;
+        std::string     immediate;
+    };
 
-    int2                                position;
-    const NodeType *                    nodeType;
-    std::vector<Wire>                   inputs;
-    int                                 flowOutputIndex;
+    int                 x,y;
+    const NodeType *    nodeType;
+    std::vector<Wire>   inputs;
+    int                 flowOutputIndex;
 
-    bool                                selected;
+    bool                selected;
 
-                                        Node()                                              : selected(), flowOutputIndex(-1) {}
-                                        Node(const int2 & position, const NodeType * type)  : position(position), nodeType(type), inputs(type->GetInputCount(),{-1,-1}), flowOutputIndex(-1), selected() {}
+                        Node()                                      : x(), y(), nodeType(), flowOutputIndex(-1), selected() {}
+                        Node(int x, int y, const NodeType & type)   : x(x), y(y), nodeType(&type), inputs(type.GetInputCount(),{-1,-1}), flowOutputIndex(-1), selected() {}
 };
 
 void ExecuteEvent(const std::vector<Node> & nodes, int startIndex);
