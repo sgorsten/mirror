@@ -121,8 +121,8 @@ void OnMouse(int button, int state, int x, int y)
                         auto nodeRect = NodeView(node).GetNodeRect();
                         if(nodeRect.b0.x > selectRect.b1.x) continue;
                         if(nodeRect.b1.x < selectRect.b0.x) continue;
-                        if(nodeRect.b0.x > selectRect.b1.y) continue;
-                        if(nodeRect.b1.x < selectRect.b0.y) continue;
+                        if(nodeRect.b0.y > selectRect.b1.y) continue;
+                        if(nodeRect.b1.y < selectRect.b0.y) continue;
                         node.selected = true;
                     }
                 }
