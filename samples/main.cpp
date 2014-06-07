@@ -117,7 +117,7 @@ void OnMouse(int button, int state, int x, int y)
       
                     for(auto & node : editor.nodes)
                     {
-                        auto nodeRect = node.GetNodeRect();
+                        auto nodeRect = NodeView(node).GetNodeRect();
                         if(nodeRect.b0.x > selectRect.b1.x) continue;
                         if(nodeRect.b1.x < selectRect.b0.x) continue;
                         if(nodeRect.b0.x > selectRect.b1.y) continue;

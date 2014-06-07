@@ -55,7 +55,7 @@ void EventExecutionRecord::LazilyUpdatePureNode(int index)
 {
     // If this node is sequenced, simply verify that it has been run at least once
     auto & node = nodes[index];
-    if(node.HasInFlow() || node.HasOutFlow())
+    if(node.nodeType->hasInFlow || node.nodeType->hasOutFlow)
     {
         if(nodeRecords[index].timestamp == 0) throw std::runtime_error("Sequencing error! Node depends on sequenced node which has not yet been run!");
         return;
@@ -96,7 +96,7 @@ void EventExecutionRecord::ExecuteNode(int index)
         {
             if(wire.immediate.empty()) return;
 
-            auto type = node.GetInputType(i);
+            auto type = node.nodeType->GetInputType(i);
             assert(type.indirection == VarType::None);
             if(type.type->index == typeid(int))
             {
@@ -160,7 +160,7 @@ JsonValue SaveGraph(const std::vector<Node> & nodes)
         }
         if(!jWires.empty()) jNode.push_back({"wires", jWires});
 
-        if(node.HasOutFlow()) jNode.push_back({"next", node.flowOutputIndex});
+        if(node.nodeType->hasOutFlow) jNode.push_back({"next", node.flowOutputIndex});
 
         jNodes.push_back(jNode);
     }

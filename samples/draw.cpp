@@ -76,7 +76,7 @@ void GraphEditor::Draw() const
     for(const auto & n : nodes)
     {
         if(!n.selected) continue;
-        auto rect = n.GetNodeRect();
+        auto rect = NodeView(n).GetNodeRect();
         r.DrawRect(rect.b0.x-4, rect.b0.y-4, rect.b1.x+4, rect.b1.y+4);
     }
 
@@ -84,23 +84,24 @@ void GraphEditor::Draw() const
     glColor3f(0.3f,0.3f,0.3f);
     for(const auto & n : nodes)
     {
-        r.DrawRect(n.GetNodeRect());
+        r.DrawRect(NodeView(n).GetNodeRect());
     }
 
     // Draw wires
     glColor3f(1,1,1);
     for(const auto & n : nodes)
     {
-        if(n.HasOutFlow() && n.flowOutputIndex >= 0)
+        NodeView nv(n);
+        if(nv.HasOutFlow() && n.flowOutputIndex >= 0)
         {
-            r.DrawLine(n.GetFlowOutputRect().GetCenter(), nodes[n.flowOutputIndex].GetFlowInputRect().GetCenter());
+            r.DrawLine(nv.GetFlowOutputRect().GetCenter(), NodeView(nodes[n.flowOutputIndex]).GetFlowInputRect().GetCenter());
         }
         for(size_t i=0; i<n.inputs.size(); ++i)
         {
             auto wire = n.inputs[i];
             if(wire.nodeIndex >= 0 && wire.nodeIndex < nodes.size())
             {
-                r.DrawLine(nodes[wire.nodeIndex].GetOutputPinRect(wire.pinIndex).GetCenter(), n.GetInputPinRect(i).GetCenter());
+                r.DrawLine(NodeView(nodes[wire.nodeIndex]).GetOutputPinRect(wire.pinIndex).GetCenter(), nv.GetInputPinRect(i).GetCenter());
             }
         }
     }
@@ -114,18 +115,19 @@ void GraphEditor::Draw() const
     // Draw node contents
     for(const auto & n : nodes)
     {
-        auto rect = n.GetContentsRect();
+        NodeView nv(n);
+        auto rect = nv.GetContentsRect();
         const auto & label = n.nodeType->GetLabel();
         if(!label.empty())
         {
             glColor3f(1,1,1);
             r.DrawText18(rect.b0, label);
-            rect.b0.y += n.GetLineSpacing();
+            rect.b0.y += nv.GetLineSpacing();
         }
 
-        if(n.HasInFlow())
+        if(nv.HasInFlow())
         {
-            rect = n.GetFlowInputRect();
+            rect = nv.GetFlowInputRect();
             auto center = rect.GetCenter();
             glBegin(GL_TRIANGLE_FAN);
             if(clicked.type == Feature::FlowOutput) glColor3f(1,1,0);
@@ -138,9 +140,9 @@ void GraphEditor::Draw() const
             glEnd();
         }          
 
-        if(n.HasOutFlow())
+        if(nv.HasOutFlow())
         {
-            rect = n.GetFlowOutputRect();
+            rect = nv.GetFlowOutputRect();
             auto center = rect.GetCenter();
             glBegin(GL_TRIANGLE_FAN);
             if(clicked.type == Feature::FlowInput) glColor3f(1,1,0);
@@ -153,33 +155,33 @@ void GraphEditor::Draw() const
             glEnd();            
         }
 
-        for(size_t i=0; i<n.GetInputCount(); ++i)
+        for(size_t i=0; i<nv.GetInputCount(); ++i)
         {
-            rect = n.GetInputPinRect(i);
-            if(clicked.type == Feature::Output && IsAssignable(clicked.GetPinType(), n.GetInputType(i))) glColor3f(1,1,0);
+            rect = nv.GetInputPinRect(i);
+            if(clicked.type == Feature::Output && IsAssignable(clicked.GetPinType(), nv.GetInputType(i))) glColor3f(1,1,0);
             else glColor3f(0.5f,0.5f,0.5f);
             r.DrawRect(rect);
 
             glColor3f(1,1,1);
-            r.DrawText12({rect.b1.x + n.GetPinPadding(), rect.b0.y}, n.GetInputLabel(i));
+            r.DrawText12({rect.b1.x + nv.GetPinPadding(), rect.b0.y}, nv.GetInputLabel(i));
             if(n.inputs[i].nodeIndex < 0 && !n.inputs[i].immediate.empty())
             {
                 std::string val = n.inputs[i].immediate;
                 glColor3f(0,1,1);
-                r.DrawText12(rect.b0 - int2(n.GetPinPadding() + GetStringWidth12(val), 0), val);
+                r.DrawText12(rect.b0 - int2(nv.GetPinPadding() + GetStringWidth12(val), 0), val);
             }
         }
 
-        for(size_t i=0; i<n.GetOutputCount(); ++i)
+        for(size_t i=0; i<nv.GetOutputCount(); ++i)
         {
-            rect = n.GetOutputPinRect(i);
-            if(clicked.type == Feature::Input && IsAssignable(n.GetOutputType(i), clicked.GetPinType())) glColor3f(1,1,0);
+            rect = nv.GetOutputPinRect(i);
+            if(clicked.type == Feature::Input && IsAssignable(nv.GetOutputType(i), clicked.GetPinType())) glColor3f(1,1,0);
             else glColor3f(0.5f,0.5f,0.5f);
             r.DrawRect(rect);
 
             glColor3f(1,1,1);
-            auto lbl = n.GetOutputLabel(i);
-            r.DrawText12(rect.b0 - int2(n.GetPinPadding() + GetStringWidth12(lbl), 0), lbl);
+            auto lbl = nv.GetOutputLabel(i);
+            r.DrawText12(rect.b0 - int2(nv.GetPinPadding() + GetStringWidth12(lbl), 0), lbl);
         }
     }
 

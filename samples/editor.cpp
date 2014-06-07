@@ -27,10 +27,10 @@ Rect Feature::GetPinRect() const
 {
     switch(type)
     {
-    case Input: return node->GetInputPinRect(pin);
-    case Output: return node->GetOutputPinRect(pin);
-    case FlowInput: return node->GetFlowInputRect();
-    case FlowOutput: return node->GetFlowOutputRect();
+    case Input: return NodeView(*node).GetInputPinRect(pin);
+    case Output: return NodeView(*node).GetOutputPinRect(pin);
+    case FlowInput: return NodeView(*node).GetFlowInputRect();
+    case FlowOutput: return NodeView(*node).GetFlowOutputRect();
     default: assert(false); return {};
     }
 }
@@ -47,8 +47,8 @@ bool GraphEditor::IsCompatible(const Feature & a, const Feature & b) const
     {
     case Feature::FlowInput: return b.type == Feature::FlowOutput;
     case Feature::FlowOutput: return b.type == Feature::FlowInput;
-    case Feature::Input: return b.type == Feature::Output && IsAssignable(b.node->GetOutputType(b.pin), a.node->GetInputType(a.pin));
-    case Feature::Output: return b.type == Feature::Input && IsAssignable(a.node->GetOutputType(a.pin), b.node->GetInputType(b.pin));
+    case Feature::Input: return b.type == Feature::Output && IsAssignable(NodeView(*b.node).GetOutputType(b.pin), NodeView(*a.node).GetInputType(a.pin));
+    case Feature::Output: return b.type == Feature::Input && IsAssignable(NodeView(*a.node).GetOutputType(a.pin), NodeView(*b.node).GetInputType(b.pin));
     default: return false;
     }
 }
@@ -65,8 +65,8 @@ void GraphEditor::ConnectPins(Feature a, Feature b)
     if(b.type == Feature::Input) std::swap(a, b);
     if(a.type == Feature::Input && b.type == Feature::Output)
     {
-        auto paramType = a.node->GetInputType(a.pin);
-        auto argType = b.node->GetOutputType(b.pin);
+        auto paramType = NodeView(*a.node).GetInputType(a.pin);
+        auto argType = NodeView(*b.node).GetOutputType(b.pin);
         if(paramType.type != argType.type) return;
         a.node->inputs[a.pin] = {b.node - nodes.data(), b.pin};
     }
@@ -76,35 +76,36 @@ Feature GraphEditor::GetFeature(const int2 & coord)
 {
     for(auto & n : nodes)
     {
-        if(n.GetNodeRect().Contains(coord))
+        NodeView nv(n);
+        if(nv.GetNodeRect().Contains(coord))
         {
-            if(n.HasInFlow())
+            if(nv.HasInFlow())
             {
-                if(n.GetFlowInputRect().Contains(coord))
+                if(nv.GetFlowInputRect().Contains(coord))
                 {
                     return {coord, Feature::FlowInput, &n, 0};
                 }
             }
 
-            if(n.HasOutFlow())
+            if(nv.HasOutFlow())
             {
-                if(n.GetFlowOutputRect().Contains(coord))
+                if(nv.GetFlowOutputRect().Contains(coord))
                 {
                     return {coord, Feature::FlowOutput, &n, 0};
                 }
             }
 
-            for(size_t i=0; i<n.GetInputCount(); ++i)
+            for(size_t i=0; i<nv.GetInputCount(); ++i)
             {
-                if(n.GetInputPinRect(i).Contains(coord))
+                if(nv.GetInputPinRect(i).Contains(coord))
                 {
                     return {coord, Feature::Input, &n, i};
                 }
             }
 
-            for(size_t i=0; i<n.GetOutputCount(); ++i)
+            for(size_t i=0; i<nv.GetOutputCount(); ++i)
             {
-                if(n.GetOutputPinRect(i).Contains(coord))
+                if(nv.GetOutputPinRect(i).Contains(coord))
                 {
                     return {coord, Feature::Output, &n, i};
                 }

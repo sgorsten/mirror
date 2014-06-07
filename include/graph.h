@@ -46,9 +46,6 @@ public:
     template<class T> ToString & operator << (const T & val) { ss << val; return *this; }
 };
 
-int GetStringWidth12(const std::string & text);
-int GetStringWidth18(const std::string & text);
-
 void WriteValue(std::ostream & out, const Type & type, void * value);
 std::string ToStr(const Type & type, void * value);
 
@@ -142,48 +139,7 @@ struct Node
     bool                                selected;
 
                                         Node()                                              : selected(), flowOutputIndex(-1) {}
-                                        Node(const int2 & position, const NodeType * type)  : position(position), nodeType(type), inputs(GetInputCount(),{-1,-1}), flowOutputIndex(-1), selected() {}
-
-    int                                 GetInputCount() const                               { return nodeType->GetInputCount(); }
-    int                                 GetOutputCount() const                              { return nodeType->GetOutputCount(); }
-    VarType                             GetInputType(size_t index) const                    { return nodeType->GetInputType(index); }
-    VarType                             GetOutputType(size_t index) const                   { return nodeType->GetOutputType(index); }
-
-    int                                 GetPinSize() const                                  { return 16; }
-    int                                 GetPinPadding() const                               { return 2; }
-    int                                 GetColumnPadding() const                            { return 10; }
-    int                                 GetLineSize() const                                 { return 22; }
-    int                                 GetLinePadding() const                              { return 2; }
-
-    std::string                         GetInputLabel(size_t index) const                   { return nodeType->GetInputLabel(index); }
-    std::string                         GetOutputLabel(size_t index) const                  { return nodeType->GetOutputLabel(index); }
-
-    bool                                HasInFlow() const                                   { return nodeType->hasInFlow; }
-    bool                                HasOutFlow() const                                  { return nodeType->hasOutFlow; }
-    int                                 GetFlowControlSize() const                          { return HasInFlow() || HasOutFlow() ? GetPinSpacing() : 0; }
-    Rect                                GetFlowInputRect() const                            { return GetPinRect(position.x,position.y); }
-    Rect                                GetFlowOutputRect() const                           { return GetPinRect(position.x+GetSizeX()-GetPinSize(),position.y); }
-
-    int                                 GetPinSpacing() const                               { return GetPinSize() + GetPinPadding(); }
-    int                                 GetLineSpacing() const                              { return GetLineSize() + GetLinePadding(); }
-    int                                 GetPinColumnSize(int pins) const                    { return pins>0 ? (GetPinSize() + GetPinSpacing()*(pins-1)) : 0; }
-    int                                 GetLineColumnSize(int pins) const                   { return pins>0 ? (GetLineSize() + GetLineSpacing()*(pins-1)) : 0; }
-    int                                 GetInputColumnSize() const                          { return GetPinColumnSize(GetInputCount()); }
-    int                                 GetContentsColumnSize() const                       { return GetLineColumnSize(1); }
-    int                                 GetOutputColumnSize() const                         { return GetPinColumnSize(GetOutputCount()); }
-    int                                 GetInnerSizeY() const                               { return std::max<int>({GetInputColumnSize(), GetContentsColumnSize(), GetOutputColumnSize()}); }
-    int                                 GetSizeY() const                                    { return GetFlowControlSize() + GetInnerSizeY(); }
-
-    int                                 GetInputColumnLabelWidth() const                    { int w=0; for(size_t i=0, n=GetInputCount(); i!=n; ++i) w = std::max(w, GetStringWidth12(GetInputLabel(i))); return w; }
-    int                                 GetContentsColumnWidth() const                      { return GetStringWidth18(nodeType->GetLabel()); }
-    int                                 GetOutputColumnLabelWidth() const                   { int w=0; for(size_t i=0, n=GetOutputCount(); i!=n; ++i) w = std::max(w, GetStringWidth12(GetOutputLabel(i))); return w; }
-    int                                 GetSizeX() const                                    { return GetPinSpacing() * 2 + GetInputColumnLabelWidth() + GetContentsColumnWidth() + GetOutputColumnLabelWidth() + GetColumnPadding() * 2; }
-
-    Rect                                GetNodeRect() const                                 { return {position, position + int2(GetSizeX(),GetSizeY())}; }
-    Rect                                GetPinRect(int x, int y) const                      { return {int2(x,y), int2(x,y) + int2(GetPinSize(),GetPinSize())}; }
-    Rect                                GetInputPinRect(size_t i) const                     { return GetPinRect(position.x, position.y + GetFlowControlSize() + (GetInnerSizeY()-GetInputColumnSize())/2 + (int)i*GetPinSpacing()); }
-    Rect                                GetOutputPinRect(size_t i) const                    { return GetPinRect(position.x+GetSizeX()-GetPinSize(), position.y + GetFlowControlSize() + (GetInnerSizeY()-GetOutputColumnSize())/2 + (int)i*GetPinSpacing()); }
-    Rect                                GetContentsRect() const                             { auto x0 = position.x+GetPinSize()+GetInputColumnLabelWidth()+GetColumnPadding(); return {int2(x0,position.y), int2(x0,position.y) + int2(GetContentsColumnWidth(),GetSizeY())}; }
+                                        Node(const int2 & position, const NodeType * type)  : position(position), nodeType(type), inputs(type->GetInputCount(),{-1,-1}), flowOutputIndex(-1), selected() {}
 };
 
 void ExecuteEvent(const std::vector<Node> & nodes, int startIndex);
