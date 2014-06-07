@@ -145,16 +145,16 @@ void OnMouse(int button, int state, int x, int y)
             }
             else if(editor.mouseover.type == Feature::Body)
             {
-                auto type = editor.mouseover.node->nodeType;
-                if(type->hasOutFlow && !type->hasInFlow) // Event!
+                auto type = editor.mouseover.node->type;
+                if(type.HasOutFlow() && !type.HasInFlow()) // Event!
                 {
                     glutSetWindow(g_sketchpadGlutWindow);
                     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
                     try
                     {
-                        Event ev = Compile(editor.nodes, editor.mouseover.node - editor.nodes.data()); 
-                        ev();
+                        auto program = Compile(editor.nodes, editor.mouseover.node - editor.nodes.data()); 
+                        program();
                     }
                     catch(const std::exception & e)
                     {

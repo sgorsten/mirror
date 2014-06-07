@@ -117,7 +117,7 @@ void GraphEditor::Draw() const
     {
         NodeView nv(n);
         auto rect = nv.GetContentsRect();
-        const auto & label = n.nodeType->GetLabel();
+        const auto & label = n.type.GetLabel();
         if(!label.empty())
         {
             glColor3f(1,1,1);

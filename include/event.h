@@ -4,53 +4,35 @@
 
 #include "refl.h"
 
-struct NodeType
+class NodeType
 {
-    struct Pin { std::string label; VarType type; };
-    std::string uniqueId, label;
-    std::vector<Pin> inputs, outputs;
-    bool hasInFlow;
-    bool hasOutFlow;
-    std::function<std::vector<std::shared_ptr<void>>(void **)> eval;
-
-    const std::string & GetUniqueId() const { return uniqueId; }
-    const std::string & GetLabel() const { return label; }
-
-    static NodeType MakeEventNode(std::string name);
-    static NodeType MakeFunctionNode(const Function & function);
-    static NodeType MakeSplitNode(const Type & type);
-    static NodeType MakeBuildNode(const Type & type);
-};
-
-
-struct Program
-{
-    struct Call
-    {
-        const NodeType * nodeType;
-        std::vector<size_t> inputSlotIndices;
-        std::vector<size_t> outputSlotIndices;
-    };
-
-    std::vector<std::shared_ptr<void>>  constants;          // Program constants, which occupy the first set of temporary slots
-    size_t                              numTemporarySlots;  // Total number of temporary slots needed
-    std::vector<Call>                   calls;              // List of calls to be made
-
-    void                                Execute() const;    // Execute the program
-};
-
-class Event
-{
-    std::shared_ptr<const Program> program;
+    friend class Program;
+    struct Impl; std::shared_ptr<const Impl> impl;
 public:
-    Event() : program() {}
-    Event(std::shared_ptr<const Program> program) : program(program) {}
+    struct Pin { std::string label; VarType type; };
 
-    void operator()() const 
-    { 
-        if(!program) return;
-        program->Execute(); 
-    }
+    const std::string &         GetUniqueId() const;
+    const std::string &         GetLabel() const;
+    const std::vector<Pin> &    GetInputs() const;
+    const std::vector<Pin> &    GetOutputs() const;
+    bool                        HasInFlow() const;
+    bool                        HasOutFlow() const;
+
+    static NodeType             MakeEventNode(std::string name);
+    static NodeType             MakeFunctionNode(const Function & function);
+    static NodeType             MakeSplitNode(const Type & type);
+    static NodeType             MakeBuildNode(const Type & type);
+};
+
+class Program
+{
+    struct Impl; std::shared_ptr<const Impl> impl; 
+public:
+    struct Line { NodeType type; std::vector<size_t> inputs, outputs; };
+
+    static Program Load(std::vector<std::shared_ptr<void>> constants, std::vector<Line> lines);
+
+    void operator()() const;
 };
 
 #endif

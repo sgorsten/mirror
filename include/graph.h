@@ -13,18 +13,18 @@ struct Node
         std::string     immediate;
     };
 
-    const NodeType *    nodeType;                                   // The type of this node
+    NodeType            type;                                       // The type of this node
     std::vector<Wire>   inputs;                                     // Wires which carry data from other nodes' outputs to this node's inputs
     int                 flowOutputIndex;                            // Flow control wire which passes execution from this node to another node after it is run
 
     int                 x,y;                                        // A set of coordinates, provided for visualization/editing convenience. Has no effect on execution, but will be serialized to/from JSON.
     bool                selected;                                   // A selection flag, provided for visualization/editing convenience. Has no effect on execution, and will not be serialized to/from JSON.
 
-                        Node()                                      : nodeType(), flowOutputIndex(-1), x(), y(), selected() {}
-                        Node(const NodeType & type, int x, int y)   : nodeType(&type), inputs(type.inputs.size(), {-1,-1}), flowOutputIndex(-1), x(x), y(y), selected() {}
+                        Node()                                      : type(), flowOutputIndex(-1), x(), y(), selected() {}
+                        Node(const NodeType & type, int x, int y)   : type(type), inputs(type.GetInputs().size(), {-1,-1}), flowOutputIndex(-1), x(x), y(y), selected() {}
 };
 
-std::shared_ptr<const Program> Compile(const std::vector<Node> & nodes, int startIndex);
+Program Compile(const std::vector<Node> & nodes, int startIndex);
 
 class JsonValue;
 JsonValue SaveGraph(const std::vector<Node> & nodes);

@@ -13,30 +13,82 @@ class ProgramCompiler
         std::vector<size_t> inputSlots;
         std::vector<size_t> outputSlots;
         bool used;
-        int timestamp;
+        size_t timestamp;
         NodeRecord() : used(), timestamp() {}
     };
 
-    Program & program;
     const std::vector<Node> & nodes;
     std::vector<NodeRecord> nodeRecords;
-    std::vector<std::shared_ptr<void>> allProducedValues;
-    int timestamp;
+    std::vector<std::shared_ptr<void>> constants;
+    std::vector<Program::Line> lines;
+    size_t totalSlots;
+    size_t timestamp;
 
     void CompileConstants(int index);
-    void ExecuteNode(int index);
-    void LazilyUpdatePureNode(int index);
+    void LazilyEmitPureLine(int index);
+    void EmitLine(int index);
 public:
-    ProgramCompiler::ProgramCompiler(Program & program, const std::vector<Node> & nodes) : program(program), nodes(nodes), timestamp() {}
-    void Compile(int startIndex);
+    ProgramCompiler::ProgramCompiler(const std::vector<Node> & nodes) : nodes(nodes), nodeRecords(nodes.size()), totalSlots(), timestamp() {}
+    Program Compile(int startIndex);
 };
 
-std::shared_ptr<const Program> Compile(const std::vector<Node> & nodes, int startIndex)
+Program Compile(const std::vector<Node> & nodes, int startIndex)
 {
-    auto program = std::make_shared<Program>();
-    ProgramCompiler compiler(*program, nodes);
-    compiler.Compile(startIndex);
-    return program;
+    return ProgramCompiler(nodes).Compile(startIndex);
+}
+
+Program ProgramCompiler::Compile(int nodeIndex)
+{
+    // Reserve input and output slot indices for every node
+    for(size_t i=0; i<nodes.size(); ++i)
+    {
+        nodeRecords[i].inputSlots.resize(nodes[i].type.GetInputs().size());
+        nodeRecords[i].outputSlots.resize(nodes[i].type.GetOutputs().size());
+    }
+
+    // Compile all constants and mark used nodes
+    for(int i = nodeIndex; i != -1; i = nodes[i].flowOutputIndex)
+    {
+        CompileConstants(i);
+    }
+    totalSlots = constants.size();
+
+    // Reserve temporary slots for outputs of all used functions
+    for(size_t i=0; i<nodes.size(); ++i)
+    {
+        if(!nodeRecords[i].used) continue;
+        for(size_t j=0; j<nodes[i].type.GetOutputs().size(); ++j)
+        {
+            nodeRecords[i].outputSlots[j] = totalSlots + j;
+        }
+        totalSlots += nodes[i].type.GetOutputs().size();
+    }
+
+    // Determine temporary slot indices to use for function inputs
+    for(size_t i=0; i<nodes.size(); ++i)
+    {
+        if(!nodeRecords[i].used) continue;
+        for(size_t j=0; j<nodes[i].type.GetInputs().size(); ++j)
+        {
+            auto & input = nodes[i].inputs[j];
+            if(input.nodeIndex == -1) continue; // Immediates were already set during CompileConstants() phase
+            nodeRecords[i].inputSlots[j] = nodeRecords[input.nodeIndex].outputSlots[input.pinIndex];
+        }
+    }
+
+    // Emit calls for nodes in order
+    for(int i = nodeIndex; i != -1; i = nodes[i].flowOutputIndex)
+    {
+        ++timestamp;
+        for(auto & input : nodes[i].inputs)
+        {
+            if(input.nodeIndex >= 0) LazilyEmitPureLine(input.nodeIndex);
+        }
+        EmitLine(i);
+    }
+
+    // Load the resulting program
+    return Program::Load(constants, lines);
 }
 
 void ProgramCompiler::CompileConstants(int index)
@@ -53,23 +105,23 @@ void ProgramCompiler::CompileConstants(int index)
         {
             if(input.immediate.empty()) throw std::runtime_error("Compile error - Wire not connected and no immediate present!");
 
-            auto type = node.nodeType->inputs[i].type;
+            auto type = node.type.GetInputs()[i].type;
             assert(type.indirection == VarType::None);
             if(type.type->index == typeid(int))
             {
                 std::istringstream ss(input.immediate);
                 int value; if(!(ss >> value)) throw std::runtime_error("Compile error - Unable to parse int from "+input.immediate);
-                program.constants.push_back(std::make_shared<int>(value));
+                constants.push_back(std::make_shared<int>(value));
             }
             else if(type.type->index == typeid(float))
             {
                 std::istringstream ss(input.immediate);
                 float value; if(!(ss >> value)) throw std::runtime_error("Compile error - Unable to parse float from "+input.immediate);
-                program.constants.push_back(std::make_shared<float>(value));
+                constants.push_back(std::make_shared<float>(value));
             }           
             else throw std::runtime_error(std::string("Compile error - Immediates are not supported for ")+type.type->index.name());
 
-            record.inputSlots[i] = program.constants.size()-1;
+            record.inputSlots[i] = constants.size()-1;
         }
         else // Wired to other node
         {
@@ -78,69 +130,11 @@ void ProgramCompiler::CompileConstants(int index)
     }
 }
 
-void ProgramCompiler::Compile(int nodeIndex)
-{
-    program.calls.clear();
-    program.constants.clear();
-    program.numTemporarySlots = 0;
-
-    // Reserve input and output slot indices for every node
-    nodeRecords.resize(nodes.size());
-    for(size_t i=0; i<nodes.size(); ++i)
-    {
-        nodeRecords[i].used = 0;
-        nodeRecords[i].timestamp = 0;
-        nodeRecords[i].inputSlots.resize(nodes[i].nodeType->inputs.size());
-        nodeRecords[i].outputSlots.resize(nodes[i].nodeType->outputs.size());
-    }
-
-    // Compile all constants and mark used nodes
-    for(int i = nodeIndex; i != -1; i = nodes[i].flowOutputIndex)
-    {
-        CompileConstants(i);
-    }
-    program.numTemporarySlots = program.constants.size();
-
-    // Reserve temporary slots for outputs of all used functions
-    for(size_t i=0; i<nodes.size(); ++i)
-    {
-        if(!nodeRecords[i].used) continue;
-        for(size_t j=0; j<nodes[i].nodeType->outputs.size(); ++j)
-        {
-            nodeRecords[i].outputSlots[j] = program.numTemporarySlots + j;
-        }
-        program.numTemporarySlots += nodes[i].nodeType->outputs.size();
-    }
-
-    // Determine temporary slot indices to use for function inputs
-    for(size_t i=0; i<nodes.size(); ++i)
-    {
-        if(!nodeRecords[i].used) continue;
-        for(size_t j=0; j<nodes[i].nodeType->inputs.size(); ++j)
-        {
-            auto & input = nodes[i].inputs[j];
-            if(input.nodeIndex == -1) continue; // Immediates were already set during CompileConstants() phase
-            nodeRecords[i].inputSlots[j] = nodeRecords[input.nodeIndex].outputSlots[input.pinIndex];
-        }
-    }
-
-    // Emit calls for nodes in order
-    for(int i = nodeIndex; i != -1; i = nodes[i].flowOutputIndex)
-    {
-        ++timestamp;
-        for(auto & input : nodes[i].inputs)
-        {
-            if(input.nodeIndex >= 0) LazilyUpdatePureNode(input.nodeIndex);
-        }
-        ExecuteNode(i);
-    }
-}
-
-void ProgramCompiler::LazilyUpdatePureNode(int index)    
+void ProgramCompiler::LazilyEmitPureLine(int index)    
 {
     // If this node is sequenced, simply verify that it has been run at least once
     auto & node = nodes[index];
-    if(node.nodeType->hasInFlow || node.nodeType->hasOutFlow)
+    if(node.type.HasInFlow() || node.type.HasOutFlow())
     {
         if(nodeRecords[index].timestamp == 0) throw std::runtime_error("Sequencing error! Node depends on sequenced node which has not yet been run!");
         return;
@@ -159,25 +153,25 @@ void ProgramCompiler::LazilyUpdatePureNode(int index)
         if(input.nodeIndex >= 0)
         {
             // Allow this input to update if it needs to. If this input was recomputed more recently than our node, we also need to recompute
-            LazilyUpdatePureNode(input.nodeIndex);
+            LazilyEmitPureLine(input.nodeIndex);
             if(nodeRecords[input.nodeIndex].timestamp > nodeRecords[index].timestamp) needsUpdate = true;
         }
     }
 
     // If this node needs an update, lets recompute it
-    if(needsUpdate) ExecuteNode(index);
+    if(needsUpdate) EmitLine(index);
 }
 
-void ProgramCompiler::ExecuteNode(int index)
+void ProgramCompiler::EmitLine(int index)
 {
     const auto & node = nodes[index];
     auto & record = nodeRecords[index];
 
-    Program::Call call;
-    call.nodeType = node.nodeType;
-    call.inputSlotIndices = record.inputSlots;
-    call.outputSlotIndices = record.outputSlots;
-    program.calls.push_back(call);
+    Program::Line line;
+    line.type = node.type;
+    line.inputs = record.inputSlots;
+    line.outputs = record.outputSlots;
+    lines.push_back(line);
 
     record.timestamp = timestamp;
 }
@@ -194,7 +188,7 @@ JsonValue SaveGraph(const std::vector<Node> & nodes)
         JsonObject jNode = {
             {"x", node.x},
             {"y", node.y},
-            {"id", node.nodeType->GetUniqueId()}
+            {"id", node.type.GetUniqueId()}
         };       
 
         JsonArray jWires;
@@ -209,7 +203,7 @@ JsonValue SaveGraph(const std::vector<Node> & nodes)
         }
         if(!jWires.empty()) jNode.push_back({"wires", jWires});
 
-        if(node.nodeType->hasOutFlow) jNode.push_back({"next", node.flowOutputIndex});
+        if(node.type.HasOutFlow()) jNode.push_back({"next", node.flowOutputIndex});
 
         jNodes.push_back(jNode);
     }
