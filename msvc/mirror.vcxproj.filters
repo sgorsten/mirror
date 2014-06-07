@@ -7,6 +7,12 @@
     <ClInclude Include="..\include\json.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\graph.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\event.h">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="include">
@@ -21,6 +27,12 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="..\src\json.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\graph.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\include\event.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>

@@ -1,11 +1,18 @@
-#ifndef GRAPH_H
-#define GRAPH_H
+#ifndef EDITOR_H
+#define EDITOR_H
 
-#include "refl.h"
-#include "json.h"
+#include "graph.h"
 
-#include <sstream>
 #include <algorithm>
+#include <sstream>
+
+class ToString
+{
+    std::ostringstream ss;
+public:
+    operator std::string() const { return ss.str(); }
+    template<class T> ToString & operator << (const T & val) { ss << val; return *this; }
+};
 
 template<class T> struct vec2
 { 
@@ -35,116 +42,21 @@ struct Rect
     bool Contains(const int2 & p) const { return p.x >= b0.x && p.y >= b0.y && p.x < b1.x && p.y < b1.y; }
 };
 
-class ToString
-{
-    std::ostringstream ss;
-public:
-    operator std::string() const { return ss.str(); }
-    template<class T> ToString & operator << (const T & val) { ss << val; return *this; }
-};
-
 int GetStringWidth12(const std::string & text);
 int GetStringWidth18(const std::string & text);
 
-void WriteValue(std::ostream & out, const Type & type, void * value);
-std::string ToStr(const Type & type, void * value);
-
-struct NodeType
+struct NodeView
 {
-    struct Pin { std::string label; VarType type; };
-    std::string uniqueId, label;
-    std::vector<Pin> inputs, outputs;
-    bool hasInFlow;
-    bool hasOutFlow;
-    std::function<std::vector<std::shared_ptr<void>>(void **)> eval;
+    const Node & node;
+    NodeView(const Node & node) : node(node) {}
 
-    const std::string & GetUniqueId() const { return uniqueId; }
-    const std::string & GetLabel() const { return label; }
-    size_t GetInputCount() const { return inputs.size(); }
-    size_t GetOutputCount() const { return outputs.size(); }
-    VarType GetInputType(size_t index) const { return inputs[index].type; }
-    VarType GetOutputType(size_t index) const { return outputs[index].type; }
-    std::string GetInputLabel(size_t index) const { return inputs[index].label; }
-    std::string GetOutputLabel(size_t index) const { return outputs[index].label; }
-    std::vector<std::shared_ptr<void>> Evaluate(void * inputs[]) const { return eval(inputs); }
+    const NodeType &                    GetNodeType() const                                 { return node.type; }
+    const int2 &                        GetPosition() const                                 { return reinterpret_cast<const int2 &>(node.x); }
 
-    static NodeType MakeEventNode(std::string name)
-    {
-        NodeType n = {};
-        n.uniqueId = "event:"+name;
-        n.label = "On "+name;
-        n.hasOutFlow = true;
-        n.eval = [](void ** inputs) { return std::vector<std::shared_ptr<void>>{}; };
-        return n;        
-    }
-
-    static NodeType MakeFunctionNode(const Function & function)
-    {
-        NodeType n = {};
-        n.uniqueId = ToString() << "func:" << function;
-        n.label = function.GetName();
-        for(size_t i=0; i<function.GetParamCount(); ++i) n.inputs.push_back({function.GetParamName(i), function.GetParamType(i)});
-        if(function.GetReturnType().type->index != typeid(void)) n.outputs.push_back({"", function.GetReturnType()});
-        n.hasInFlow = n.hasOutFlow = true;
-        n.eval = [&function](void ** inputs) { return std::vector<std::shared_ptr<void>>{function.Invoke(inputs)}; };
-        return n;
-    }
-
-    static NodeType MakeSplitNode(const Type & type)
-    {
-        NodeType n = {};
-        n.uniqueId = ToString() << "split:" << type;
-        n.label = ToString() << "split " << type;
-        n.inputs.push_back({"", {&type, false, false, VarType::LValueRef}});
-        for(auto & f : type.fields) n.outputs.push_back({f.identifier, f.type});
-        n.eval = [&type](void ** inputs) 
-        {
-            std::vector<std::shared_ptr<void>> outputs; 
-            for(auto & field : type.fields) outputs.push_back(std::shared_ptr<void>(field.accessor(inputs[0]), [](void *){}));
-            return outputs; 
-        };
-        return n;
-    }
-
-    static NodeType MakeBuildNode(const Type & type)
-    {
-        NodeType n = {};
-        n.uniqueId = ToString() << "build:" << type;
-        n.label = ToString() << "build " << type;
-        for(auto & f : type.fields) n.inputs.push_back({f.identifier, f.type});
-        n.outputs.push_back({"", {&type, false, false, VarType::None}});
-        n.eval = [&type](void ** inputs) -> std::vector<std::shared_ptr<void>>
-        {
-            auto output = type.DefConstruct();
-            for(auto & field : type.fields)
-            {
-                assert(field.type.indirection == VarType::None);
-                field.type.type->CopyAssign(field.accessor(output.get()), *inputs++);
-            }
-            return {output};
-        };
-        return n;
-    }
-};
-
-struct Node
-{
-    struct Wire { int nodeIndex, pinIndex; std::string immediate; };
-
-    int2                                position;
-    const NodeType *                    nodeType;
-    std::vector<Wire>                   inputs;
-    int                                 flowOutputIndex;
-
-    bool                                selected;
-
-                                        Node()                                              : selected(), flowOutputIndex(-1) {}
-                                        Node(const int2 & position, const NodeType * type)  : position(position), nodeType(type), inputs(GetInputCount(),{-1,-1}), flowOutputIndex(-1), selected() {}
-
-    int                                 GetInputCount() const                               { return nodeType->GetInputCount(); }
-    int                                 GetOutputCount() const                              { return nodeType->GetOutputCount(); }
-    VarType                             GetInputType(size_t index) const                    { return nodeType->GetInputType(index); }
-    VarType                             GetOutputType(size_t index) const                   { return nodeType->GetOutputType(index); }
+    int                                 GetInputCount() const                               { return GetNodeType().GetInputs().size(); }
+    int                                 GetOutputCount() const                              { return GetNodeType().GetOutputs().size(); }
+    VarType                             GetInputType(size_t index) const                    { return GetNodeType().GetInputs()[index].type; }
+    VarType                             GetOutputType(size_t index) const                   { return GetNodeType().GetOutputs()[index].type; }
 
     int                                 GetPinSize() const                                  { return 16; }
     int                                 GetPinPadding() const                               { return 2; }
@@ -152,14 +64,14 @@ struct Node
     int                                 GetLineSize() const                                 { return 22; }
     int                                 GetLinePadding() const                              { return 2; }
 
-    std::string                         GetInputLabel(size_t index) const                   { return nodeType->GetInputLabel(index); }
-    std::string                         GetOutputLabel(size_t index) const                  { return nodeType->GetOutputLabel(index); }
+    std::string                         GetInputLabel(size_t index) const                   { return GetNodeType().GetInputs()[index].label; }
+    std::string                         GetOutputLabel(size_t index) const                  { return GetNodeType().GetOutputs()[index].label; }
 
-    bool                                HasInFlow() const                                   { return nodeType->hasInFlow; }
-    bool                                HasOutFlow() const                                  { return nodeType->hasOutFlow; }
+    bool                                HasInFlow() const                                   { return GetNodeType().HasInFlow(); }
+    bool                                HasOutFlow() const                                  { return GetNodeType().HasOutFlow(); }
     int                                 GetFlowControlSize() const                          { return HasInFlow() || HasOutFlow() ? GetPinSpacing() : 0; }
-    Rect                                GetFlowInputRect() const                            { return GetPinRect(position.x,position.y); }
-    Rect                                GetFlowOutputRect() const                           { return GetPinRect(position.x+GetSizeX()-GetPinSize(),position.y); }
+    Rect                                GetFlowInputRect() const                            { return GetPinRect(GetPosition().x,GetPosition().y); }
+    Rect                                GetFlowOutputRect() const                           { return GetPinRect(GetPosition().x+GetSizeX()-GetPinSize(),GetPosition().y); }
 
     int                                 GetPinSpacing() const                               { return GetPinSize() + GetPinPadding(); }
     int                                 GetLineSpacing() const                              { return GetLineSize() + GetLinePadding(); }
@@ -172,15 +84,15 @@ struct Node
     int                                 GetSizeY() const                                    { return GetFlowControlSize() + GetInnerSizeY(); }
 
     int                                 GetInputColumnLabelWidth() const                    { int w=0; for(size_t i=0, n=GetInputCount(); i!=n; ++i) w = std::max(w, GetStringWidth12(GetInputLabel(i))); return w; }
-    int                                 GetContentsColumnWidth() const                      { return GetStringWidth18(nodeType->GetLabel()); }
+    int                                 GetContentsColumnWidth() const                      { return GetStringWidth18(GetNodeType().GetLabel()); }
     int                                 GetOutputColumnLabelWidth() const                   { int w=0; for(size_t i=0, n=GetOutputCount(); i!=n; ++i) w = std::max(w, GetStringWidth12(GetOutputLabel(i))); return w; }
     int                                 GetSizeX() const                                    { return GetPinSpacing() * 2 + GetInputColumnLabelWidth() + GetContentsColumnWidth() + GetOutputColumnLabelWidth() + GetColumnPadding() * 2; }
 
-    Rect                                GetNodeRect() const                                 { return {position, position + int2(GetSizeX(),GetSizeY())}; }
+    Rect                                GetNodeRect() const                                 { return {GetPosition(), GetPosition() + int2(GetSizeX(),GetSizeY())}; }
     Rect                                GetPinRect(int x, int y) const                      { return {int2(x,y), int2(x,y) + int2(GetPinSize(),GetPinSize())}; }
-    Rect                                GetInputPinRect(size_t i) const                     { return GetPinRect(position.x, position.y + GetFlowControlSize() + (GetInnerSizeY()-GetInputColumnSize())/2 + (int)i*GetPinSpacing()); }
-    Rect                                GetOutputPinRect(size_t i) const                    { return GetPinRect(position.x+GetSizeX()-GetPinSize(), position.y + GetFlowControlSize() + (GetInnerSizeY()-GetOutputColumnSize())/2 + (int)i*GetPinSpacing()); }
-    Rect                                GetContentsRect() const                             { auto x0 = position.x+GetPinSize()+GetInputColumnLabelWidth()+GetColumnPadding(); return {int2(x0,position.y), int2(x0,position.y) + int2(GetContentsColumnWidth(),GetSizeY())}; }
+    Rect                                GetInputPinRect(size_t i) const                     { return GetPinRect(GetPosition().x, GetPosition().y + GetFlowControlSize() + (GetInnerSizeY()-GetInputColumnSize())/2 + (int)i*GetPinSpacing()); }
+    Rect                                GetOutputPinRect(size_t i) const                    { return GetPinRect(GetPosition().x+GetSizeX()-GetPinSize(), GetPosition().y + GetFlowControlSize() + (GetInnerSizeY()-GetOutputColumnSize())/2 + (int)i*GetPinSpacing()); }
+    Rect                                GetContentsRect() const                             { auto x0 = GetPosition().x+GetPinSize()+GetInputColumnLabelWidth()+GetColumnPadding(); return {int2(x0,GetPosition().y), int2(x0,GetPosition().y) + int2(GetContentsColumnWidth(),GetSizeY())}; }
 };
 
 struct Feature
@@ -193,12 +105,12 @@ struct Feature
 
     bool                                IsFlowPin() const                                   { return type == FlowInput || type == FlowOutput; }
     bool                                IsDataPin() const                                   { return type == Input || type == Output; }
-    VarType                             GetPinType() const                                  { assert(IsDataPin()); return type == Input ? node->GetInputType(pin) : node->GetOutputType(pin); }
+    VarType                             GetPinType() const                                  { assert(IsDataPin()); return type == Input ? node->type.GetInputs()[pin].type : node->type.GetOutputs()[pin].type; }
     Rect                                GetPinRect() const;
 };
 
-JsonValue SaveGraph(const std::vector<Node> & nodes);
-std::vector<Node> LoadGraph(const std::vector<NodeType> & nodeTypes, const JsonValue & jsonGraph);
+void WriteValue(std::ostream & out, const Type & type, void * value);
+std::string ToStr(const Type & type, void * value);
 
 struct GraphEditor
 {
@@ -227,28 +139,6 @@ struct GraphEditor
     void DeleteSelection();
 
     void Draw() const;
-};
-
-class EventExecutionRecord
-{
-    struct NodeRecord
-    {
-        std::vector<std::shared_ptr<void>> outputValues;
-        int timestamp;
-        NodeRecord() : timestamp() {}
-    };
-
-    const std::vector<Node> & nodes;
-    std::vector<NodeRecord> nodeRecords;
-    std::vector<std::shared_ptr<void>> allProducedValues;
-    int timestamp;
-
-    void ExecuteNode(int index);
-    void LazilyUpdatePureNode(int index);
-public:
-    EventExecutionRecord(const std::vector<Node> & nodes);
-
-    void ExecuteEvent(int nodeIndex);
 };
 
 #endif

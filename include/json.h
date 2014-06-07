@@ -1,6 +1,7 @@
-// json module: Provides support for parsing and printing JSON from an intermediate in-memory representation
-#ifndef JSON_H
-#define JSON_H
+// mirror/json.h
+// Provides an in-memory representation of JSON values, which can be parsed from and printed to JSON-encoded text
+#ifndef MIRROR_JSON_H
+#define MIRROR_JSON_H
 
 #include <cstdint>
 #include <cassert>

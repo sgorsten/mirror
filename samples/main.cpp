@@ -1,7 +1,9 @@
 #include "editor.h"
+#include "event.h"
 #include "json.h"
 
 #include <GL/freeglut.h>
+#include <iostream>
 #include <fstream>
 
 GraphEditor editor;
@@ -45,7 +47,8 @@ void OnMotion(int x, int y)
             {
                 if(node.selected)
                 {
-                    node.position += delta;
+                    node.x += delta.x;
+                    node.y += delta.y;
                 }
             }
             break;
@@ -68,7 +71,7 @@ void OnMouse(int button, int state, int x, int y)
                     int index = (y - editor.menuPos.y) / 16;
                     if(index >= 0 && index < editor.nodeTypes.size())
                     {
-                        editor.nodes.push_back(Node(editor.menuPos, &editor.nodeTypes[index]));
+                        editor.nodes.push_back(Node(editor.nodeTypes[index], editor.menuPos.x, editor.menuPos.y));
                     }
                     editor.mode = GraphEditor::None;
                 }
@@ -117,11 +120,11 @@ void OnMouse(int button, int state, int x, int y)
       
                     for(auto & node : editor.nodes)
                     {
-                        auto nodeRect = node.GetNodeRect();
+                        auto nodeRect = NodeView(node).GetNodeRect();
                         if(nodeRect.b0.x > selectRect.b1.x) continue;
                         if(nodeRect.b1.x < selectRect.b0.x) continue;
-                        if(nodeRect.b0.x > selectRect.b1.y) continue;
-                        if(nodeRect.b1.x < selectRect.b0.y) continue;
+                        if(nodeRect.b0.y > selectRect.b1.y) continue;
+                        if(nodeRect.b1.y < selectRect.b0.y) continue;
                         node.selected = true;
                     }
                 }
@@ -142,14 +145,21 @@ void OnMouse(int button, int state, int x, int y)
             }
             else if(editor.mouseover.type == Feature::Body)
             {
-                auto type = editor.mouseover.node->nodeType;
-                if(type->hasOutFlow && !type->hasInFlow) // Event!
+                auto type = editor.mouseover.node->type;
+                if(type.HasOutFlow() && !type.HasInFlow()) // Event!
                 {
                     glutSetWindow(g_sketchpadGlutWindow);
                     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-                    EventExecutionRecord record(editor.nodes);
-                    record.ExecuteEvent(editor.mouseover.node - editor.nodes.data());
+                    try
+                    {
+                        auto program = Compile(editor.nodes, editor.mouseover.node - editor.nodes.data()); 
+                        program();
+                    }
+                    catch(const std::exception & e)
+                    {
+                        std::cerr << e.what() << std::endl;
+                    }
 
                     glutSwapBuffers();
                     glutSetWindow(g_editorGlutWindow);
@@ -217,11 +227,23 @@ void DrawCircle(const Color & color, const Point & center, float radius)
     glEnd();
 }
 
+namespace ops
+{
+    float add(float a, float b) { return a+b; }
+    float sub(float a, float b) { return a-b; }
+    float mul(float a, float b) { return a*b; }
+    float div(float a, float b) { return a/b; }
+}
+
 void OnSketchpadDisplay() {}
 
 int main(int argc, char * argv[])
 {
     TypeLibrary types;
+    types.BindPureFunction(&ops::add, "+", {"",""});
+    types.BindPureFunction(&ops::sub, "-", {"",""});
+    types.BindPureFunction(&ops::mul, "*", {"",""});
+    types.BindPureFunction(&ops::div, "/", {"",""});
     types.BindFunction(&DrawLine, "DrawLine", {"color","p0","p1"});
     types.BindFunction(&DrawTriangle, "DrawTriangle", {"color","p0","p1","p2"});
     types.BindFunction(&DrawCircle, "DrawCircle", {"color","center","radius"});

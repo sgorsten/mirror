@@ -1,7 +1,7 @@
 [
     {
-        "x": 566,
-        "y": 238,
+        "x": 570,
+        "y": 247,
         "id": "func:void DrawCircle(Color const &,Point const &,float)",
         "wires": [
             {
@@ -12,13 +12,16 @@
                 "node": 2,
                 "pin": 0
             },
-            "0.5"
+            {
+                "node": 8,
+                "pin": 0
+            }
         ],
         "next": 4
     },
     {
-        "x": 291,
-        "y": 158,
+        "x": 258,
+        "y": 133,
         "id": "event:Start",
         "next": 0
     },
@@ -29,8 +32,8 @@
         "wires": ["0.2","0"]
     },
     {
-        "x": 307,
-        "y": 231,
+        "x": 279,
+        "y": 227,
         "id": "build:Color",
         "wires": ["1",".5","0"]
     },
@@ -62,7 +65,13 @@
         "x": 684,
         "y": 348,
         "id": "build:Point",
-        "wires": ["-0.6","0"]
+        "wires": [
+            {
+                "node": 9,
+                "pin": 0
+            },
+            "0"
+        ]
     },
     {
         "x": 693,
@@ -71,9 +80,21 @@
         "wires": ["-0.2","0.8"]
     },
     {
-        "x": 668,
-        "y": 105,
+        "x": 672,
+        "y": 114,
         "id": "build:Color",
         "wires": ["0",".5","1"]
+    },
+    {
+        "x": 313,
+        "y": 325,
+        "id": "func:float +(float,float)",
+        "wires": ["0.2","0.3"]
+    },
+    {
+        "x": 515,
+        "y": 486,
+        "id": "func:float *(float,float)",
+        "wires": ["-2",".3"]
     }
 ]
