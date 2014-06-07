@@ -23,13 +23,20 @@ bool NodeType::HasOutFlow() const { return impl->hasOutFlow; }
 // Node type creation //
 ////////////////////////
 
-NodeType NodeType::MakeEventNode(std::string name)
+NodeType NodeType::MakeEventNode(std::string name, std::vector<VarType> params)
 {
     auto impl = std::make_shared<Impl>();
     impl->uniqueId = "event:"+name;
     impl->label = "On "+name;
+    for(auto & param : params) impl->outputs.push_back({"", param});
     impl->hasOutFlow = true;
-    impl->eval = [](void ** inputs) { return std::vector<std::shared_ptr<void>>{}; };
+    size_t count = params.size();   
+    impl->eval = [count](void ** inputs) -> std::vector<std::shared_ptr<void>>
+    { 
+        std::vector<std::shared_ptr<void>> outputs;
+        for(size_t i=0; i<count; ++i) outputs.push_back(std::shared_ptr<void>(inputs[i], [](void *){}));
+        return outputs;
+    };
 
     NodeType n;
     n.impl = impl;
@@ -141,7 +148,9 @@ Program Program::Load(std::vector<std::shared_ptr<void>> constants, std::vector<
     return p;
 }
 
-void Program::operator()() const
+#include <iostream>
+
+void Program::Invoke(void * programArgs[], size_t argCount) const
 {
     if(!impl) return;
 
@@ -155,10 +164,22 @@ void Program::operator()() const
     {
         // Setup arguments list
         void * args[8];
-        for(size_t i=0; i<line.inputs.size(); ++i)
+        if(&line == impl->lines.data())
         {
-            args[i] = slotValues[line.inputs[i]].get();
-            assert(args[i] != nullptr);
+            assert(argCount == line.outputs.size());
+            for(size_t i=0; i<argCount; ++i)
+            {
+                args[i] = programArgs[i];
+                assert(args[i] != nullptr);
+            }
+        }
+        else
+        {      
+            for(size_t i=0; i<line.inputs.size(); ++i)
+            {
+                args[i] = slotValues[line.inputs[i]].get();
+                assert(args[i] != nullptr);
+            }
         }
 
         // Evalute node

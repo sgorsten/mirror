@@ -1,11 +1,17 @@
 [
     {
-        "x": 570,
-        "y": 247,
-        "id": "func:void DrawCircle(Color const &,Point const &,float)",
+        "x": 352,
+        "y": 175,
+        "id": "event:Start",
+        "next": 1
+    },
+    {
+        "x": 592,
+        "y": 233,
+        "id": "func:void DrawCircle(Sketchpad &,Color const &,Point const &,float)",
         "wires": [
             {
-                "node": 3,
+                "node": 0,
                 "pin": 0
             },
             {
@@ -13,37 +19,32 @@
                 "pin": 0
             },
             {
-                "node": 8,
+                "node": 3,
                 "pin": 0
-            }
+            },
+            ".5"
         ],
         "next": 4
     },
     {
-        "x": 258,
-        "y": 133,
-        "id": "event:Start",
-        "next": 0
-    },
-    {
-        "x": 303,
-        "y": 407,
-        "id": "build:Point",
-        "wires": ["0.2","0"]
-    },
-    {
-        "x": 279,
-        "y": 227,
+        "x": 160,
+        "y": 249,
         "id": "build:Color",
         "wires": ["1",".5","0"]
     },
     {
-        "x": 955,
-        "y": 350,
-        "id": "func:void DrawTriangle(Color const &,Point const &,Point const &,Point const &)",
+        "x": 386,
+        "y": 324,
+        "id": "build:Point",
+        "wires": ["0","0"]
+    },
+    {
+        "x": 875,
+        "y": 241,
+        "id": "func:void DrawTriangle(Sketchpad &,Color const &,Point const &,Point const &,Point const &)",
         "wires": [
             {
-                "node": 7,
+                "node": 0,
                 "pin": 0
             },
             {
@@ -51,50 +52,36 @@
                 "pin": 0
             },
             {
-                "node": 2,
+                "node": 3,
                 "pin": 0
             },
             {
                 "node": 6,
+                "pin": 0
+            },
+            {
+                "node": 7,
                 "pin": 0
             }
         ],
         "next": -1
     },
     {
-        "x": 684,
-        "y": 348,
-        "id": "build:Point",
-        "wires": [
-            {
-                "node": 9,
-                "pin": 0
-            },
-            "0"
-        ]
-    },
-    {
-        "x": 693,
-        "y": 461,
-        "id": "build:Point",
-        "wires": ["-0.2","0.8"]
-    },
-    {
-        "x": 672,
-        "y": 114,
+        "x": 612,
+        "y": 139,
         "id": "build:Color",
         "wires": ["0",".5","1"]
     },
     {
-        "x": 313,
-        "y": 325,
-        "id": "func:float +(float,float)",
-        "wires": ["0.2","0.3"]
+        "x": 379,
+        "y": 377,
+        "id": "build:Point",
+        "wires": ["-.8","0"]
     },
     {
-        "x": 515,
-        "y": 486,
-        "id": "func:float *(float,float)",
-        "wires": ["-2",".3"]
+        "x": 374,
+        "y": 430,
+        "id": "build:Point",
+        "wires": ["-.4",".8"]
     }
 ]

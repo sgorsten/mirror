@@ -18,7 +18,7 @@ public:
     bool                        HasInFlow() const;
     bool                        HasOutFlow() const;
 
-    static NodeType             MakeEventNode(std::string name);
+    static NodeType             MakeEventNode(std::string name, std::vector<VarType> params);
     static NodeType             MakeFunctionNode(const Function & function);
     static NodeType             MakeSplitNode(const Type & type);
     static NodeType             MakeBuildNode(const Type & type);
@@ -32,7 +32,22 @@ public:
 
     static Program Load(std::vector<std::shared_ptr<void>> constants, std::vector<Line> lines);
 
-    void operator()() const;
+    void Invoke(void * args[], size_t argCount) const;
+};
+
+template<class F> class Event;
+template<class... P> class Event<void(P...)>
+{
+    Program program;
+public:
+    Event() {}
+    Event(Program program) : program(program) {}
+
+    void operator()(P... p) const
+    {
+        void * args[] = {&p...};
+        program.Invoke(args, sizeof...(P));
+    }
 };
 
 #endif

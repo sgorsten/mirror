@@ -72,19 +72,12 @@ void GraphEditor::Draw() const
     glOrtho(0, 1280, 720, 0, -1, 1);
 
     // Draw outlines for selected nodes
-    glColor3f(1,1,0);
+    glColor3f(0.5f,0.5f,0);
     for(const auto & n : nodes)
     {
         if(!n.selected) continue;
         auto rect = NodeView(n).GetNodeRect();
         r.DrawRect(rect.b0.x-4, rect.b0.y-4, rect.b1.x+4, rect.b1.y+4);
-    }
-
-    // Draw node backgrounds
-    glColor3f(0.3f,0.3f,0.3f);
-    for(const auto & n : nodes)
-    {
-        r.DrawRect(NodeView(n).GetNodeRect());
     }
 
     // Draw wires
@@ -111,6 +104,16 @@ void GraphEditor::Draw() const
         else glColor3f(0.5f,0.5f,0.5f);
         r.DrawLine(clicked.GetPinRect().GetCenter(), mouseover.coord);
     }
+
+    // Draw node backgrounds
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glColor4f(0.4f,0.4f,0.4f,0.8f);
+    for(const auto & n : nodes)
+    {
+        r.DrawRect(NodeView(n).GetNodeRect());
+    }
+    glDisable(GL_BLEND);
 
     // Draw node contents
     for(const auto & n : nodes)

@@ -57,6 +57,8 @@ void OnMotion(int x, int y)
     }
 }
 
+void InvokeNode(int index);
+
 void OnMouse(int button, int state, int x, int y)
 {
     switch(button)
@@ -146,24 +148,7 @@ void OnMouse(int button, int state, int x, int y)
             else if(editor.mouseover.type == Feature::Body)
             {
                 auto type = editor.mouseover.node->type;
-                if(type.HasOutFlow() && !type.HasInFlow()) // Event!
-                {
-                    glutSetWindow(g_sketchpadGlutWindow);
-                    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-                    try
-                    {
-                        auto program = Compile(editor.nodes, editor.mouseover.node - editor.nodes.data()); 
-                        program();
-                    }
-                    catch(const std::exception & e)
-                    {
-                        std::cerr << e.what() << std::endl;
-                    }
-
-                    glutSwapBuffers();
-                    glutSetWindow(g_editorGlutWindow);
-                }
+                if(type.HasOutFlow() && !type.HasInFlow()) InvokeNode(editor.mouseover.node - editor.nodes.data()); // Event!
             }
         }
         break;
@@ -196,36 +181,40 @@ void OnDisplay()
 struct Point { float x,y; };
 struct Color { float r,g,b; };
 
-void DrawLine(const Color & color, const Point & p0, const Point & p1)
+class Sketchpad
 {
-    glBegin(GL_LINES);
-    glColor3fv(&color.r);
-    glVertex2fv(&p0.x);
-    glVertex2fv(&p1.x);
-    glEnd();
-}
-
-void DrawTriangle(const Color & color, const Point & p0, const Point & p1, const Point & p2)
-{
-    glBegin(GL_TRIANGLES);
-    glColor3fv(&color.r);
-    glVertex2fv(&p0.x);
-    glVertex2fv(&p1.x);
-    glVertex2fv(&p2.x);
-    glEnd();
-}
-
-void DrawCircle(const Color & color, const Point & center, float radius)
-{
-    glBegin(GL_TRIANGLE_FAN);
-    glColor3fv(&color.r);
-    for(int i=0; i<24; ++i)
+public:
+    void DrawLine(const Color & color, const Point & p0, const Point & p1)
     {
-        float a = i*6.28f/24;
-        glVertex2f(center.x + std::cos(a)*radius, center.y + std::sin(a)*radius);
+        glBegin(GL_LINES);
+        glColor3fv(&color.r);
+        glVertex2fv(&p0.x);
+        glVertex2fv(&p1.x);
+        glEnd();
     }
-    glEnd();
-}
+
+    void DrawTriangle(const Color & color, const Point & p0, const Point & p1, const Point & p2)
+    {
+        glBegin(GL_TRIANGLES);
+        glColor3fv(&color.r);
+        glVertex2fv(&p0.x);
+        glVertex2fv(&p1.x);
+        glVertex2fv(&p2.x);
+        glEnd();
+    }
+
+    void DrawCircle(const Color & color, const Point & center, float radius)
+    {
+        glBegin(GL_TRIANGLE_FAN);
+        glColor3fv(&color.r);
+        for(int i=0; i<24; ++i)
+        {
+            float a = i*6.28f/24;
+            glVertex2f(center.x + std::cos(a)*radius, center.y + std::sin(a)*radius);
+        }
+        glEnd();
+    }
+};
 
 namespace ops
 {
@@ -236,6 +225,24 @@ namespace ops
 }
 
 void OnSketchpadDisplay() {}
+void InvokeNode(int index)
+{
+    try
+    {
+        Event<void(Sketchpad &)> onDraw = Compile(editor.nodes, index); 
+        Sketchpad sketchpad;
+
+        glutSetWindow(g_sketchpadGlutWindow);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        onDraw(sketchpad);
+        glutSwapBuffers();
+        glutSetWindow(g_editorGlutWindow);
+    }
+    catch(const std::exception & e)
+    {
+        std::cerr << e.what() << std::endl;
+    }
+}
 
 int main(int argc, char * argv[])
 {
@@ -244,9 +251,10 @@ int main(int argc, char * argv[])
     types.BindPureFunction(&ops::sub, "-", {"",""});
     types.BindPureFunction(&ops::mul, "*", {"",""});
     types.BindPureFunction(&ops::div, "/", {"",""});
-    types.BindFunction(&DrawLine, "DrawLine", {"color","p0","p1"});
-    types.BindFunction(&DrawTriangle, "DrawTriangle", {"color","p0","p1","p2"});
-    types.BindFunction(&DrawCircle, "DrawCircle", {"color","center","radius"});
+    types.BindClass<Sketchpad>("Sketchpad")
+        .HasMethod(&Sketchpad::DrawLine, "DrawLine", {"color","p0","p1"})
+        .HasMethod(&Sketchpad::DrawTriangle, "DrawTriangle", {"color","p0","p1","p2"})
+        .HasMethod(&Sketchpad::DrawCircle, "DrawCircle", {"color","center","radius"});
     types.BindClass<Point>("Point")
         .HasField(&Point::x, "x")
         .HasField(&Point::y, "y");
@@ -255,7 +263,7 @@ int main(int argc, char * argv[])
         .HasField(&Color::g, "g")
         .HasField(&Color::b, "b");
 
-    editor.nodeTypes.push_back(NodeType::MakeEventNode("Start"));
+    editor.nodeTypes.push_back(NodeType::MakeEventNode("Start", {types.DeduceVarType<Sketchpad &>()}));
     for(auto & func : types.GetAllFunctions())
     {
         editor.nodeTypes.push_back(NodeType::MakeFunctionNode(func));
