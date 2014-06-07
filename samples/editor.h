@@ -2,6 +2,7 @@
 #define GRAPH_H
 
 #include "refl.h"
+#include "json.h"
 
 #include <sstream>
 #include <algorithm>
@@ -195,6 +196,9 @@ struct Feature
     VarType                             GetPinType() const                                  { assert(IsDataPin()); return type == Input ? node->GetInputType(pin) : node->GetOutputType(pin); }
     Rect                                GetPinRect() const;
 };
+
+JsonValue SaveGraph(const std::vector<Node> & nodes);
+std::vector<Node> LoadGraph(const std::vector<NodeType> & nodeTypes, const JsonValue & jsonGraph);
 
 struct GraphEditor
 {
