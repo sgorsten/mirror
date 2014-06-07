@@ -1,4 +1,5 @@
 #include "editor.h"
+#include "json.h"
 
 #include <GL/freeglut.h>
 
@@ -251,6 +252,87 @@ void DrawCircle(const Color & color, const Point & center, float radius)
 
 void OnSketchpadDisplay() {}
 
+auto jsonSource = R"json(
+[
+  {
+    "x":273,
+    "y":155,
+    "id":"event:Start",
+    "next":1
+  },
+  {
+    "x":504,
+    "y":199,
+    "id":"func:void DrawCircle(Color const &,Point const &,float)",
+    "wires":[
+      {"node":2, "pin":0},
+      {"node":3, "pin":0},
+      ".5"
+    ],
+    "next":4
+  },
+  {
+    "x":250,
+    "y":233,
+    "id":"build:Color",
+    "wires":[
+      "1",
+      ".5",
+      "0"
+    ]
+  },
+  {
+    "x":147,
+    "y":510,
+    "id":"build:Point",
+    "wires":[
+      ".2",
+      "0"
+    ]
+  },
+  {
+    "x":813,
+    "y":245,
+    "id":"func:void DrawTriangle(Color const &,Point const &,Point const &,Point const &)",
+    "wires":[
+      {"node":5, "pin":0},
+      {"node":7, "pin":0},
+      {"node":3, "pin":0},
+      {"node":6, "pin":0}
+    ],
+    "next":null
+  },
+  {
+    "x":528,
+    "y":97,
+    "id":"build:Color",
+    "wires":[
+      "0",
+      ".5",
+      "1"
+    ]
+  },
+  {
+    "x":379,
+    "y":551,
+    "id":"build:Point",
+    "wires":[
+      "-.6",
+      "0"
+    ]
+  },
+  {
+    "x":484,
+    "y":297,
+    "id":"build:Point",
+    "wires":[
+      "-.2",
+      ".8"
+    ]
+  }
+]
+)json";
+
 int main(int argc, char * argv[])
 {
     TypeLibrary types;
@@ -274,6 +356,47 @@ int main(int argc, char * argv[])
     editor.nodeTypes.push_back(NodeType::MakeSplitNode(types.DeduceType<Point>()));
     editor.nodeTypes.push_back(NodeType::MakeBuildNode(types.DeduceType<Color>()));
     editor.nodeTypes.push_back(NodeType::MakeSplitNode(types.DeduceType<Color>()));
+
+    auto jGraph = jsonFrom(jsonSource);
+    std::cout << tabbed(jGraph,4) << std::endl;
+
+    // Create the stored nodes
+    for(const auto & jNode : jGraph.array())
+    {    
+        const int2 position = { jNode["x"].number<int>(), jNode["y"].number<int>() };
+        const auto & id = jNode["id"].string();
+
+        NodeType * nodeType = nullptr;
+        for(auto & type : editor.nodeTypes)
+        {
+            if(id == type.GetUniqueId())
+            {
+                nodeType = &type;
+                break;
+            }
+        }
+
+        if(!nodeType) throw std::runtime_error("Unrecognized node type: "+id);
+        editor.nodes.push_back(Node(position, nodeType));
+
+        auto & node = editor.nodes.back();
+        const auto & jWires = jNode["wires"].array();
+        if(jWires.size() != node.inputs.size()) throw std::runtime_error("Node input count mismatch: "+id);
+
+        // Connect the wires
+        for(size_t i=0; i<jWires.size(); ++i)
+        {
+            const auto & jWire = jWires[i];
+            if(jWire.isString()) node.inputs[i] = {-1,-1,jWire.string()}; // Immediate value
+            else if(jWire.isObject()) node.inputs[i] = {jWire["node"].number<int>(), jWire["pin"].number<int>()}; // Wired to other node
+            else node.inputs[i] = {-1,-1}; // Not hooked up yet
+        }
+
+        // Connect flow wires
+        node.flowOutputIndex = jNode["next"].numberOrDefault(-1);
+    }
+    assert(editor.nodes.size() == jGraph.array().size());
+    // TODO: Validation
 
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGBA|GLUT_DOUBLE|GLUT_DEPTH);

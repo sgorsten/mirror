@@ -4,6 +4,9 @@
     <ClInclude Include="..\include\refl.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\json.h">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="include">
@@ -15,6 +18,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\refl.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\json.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
