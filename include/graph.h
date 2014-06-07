@@ -49,7 +49,23 @@ struct Node
                         Node(const NodeType & type, int x, int y)   : nodeType(&type), inputs(type.GetInputCount(),{-1,-1}), flowOutputIndex(-1), x(x), y(y), selected() {}
 };
 
-void ExecuteEvent(const std::vector<Node> & nodes, int startIndex);
+struct Program
+{
+    struct Call
+    { 
+        const NodeType *    type;
+        std::vector<size_t> inputSlotIndices;
+        std::vector<size_t> outputSlotIndices;
+    };
+
+    std::vector<std::shared_ptr<void>>  constants;          // Program constants, which occupy the first set of temporary slots
+    size_t                              numTemporarySlots;  // Total number of temporary slots needed
+    std::vector<Call>                   calls;              // List of calls to be made
+
+    void Execute() const;                                       // Execute the program
+};
+
+Program Compile(const std::vector<Node> & nodes, int startIndex);
 
 class JsonValue;
 JsonValue SaveGraph(const std::vector<Node> & nodes);

@@ -76,54 +76,172 @@ NodeType NodeType::MakeBuildNode(const Type & type)
 // Execution logic //
 /////////////////////
 
-class EventExecutionRecord
+void Program::Execute() const
+{
+    // Reserve enough space
+    auto slotValues = constants;
+    auto allValues = slotValues;
+    slotValues.resize(numTemporarySlots, nullptr);
+    
+    // Execute calls in order
+    for(auto & call : calls)
+    {
+        // Setup arguments list
+        void * args[8];
+        for(size_t i=0; i<call.inputSlotIndices.size(); ++i)
+        {
+            args[i] = slotValues[call.inputSlotIndices[i]].get();
+            assert(args[i] != nullptr);
+        }
+
+        // Evalute node
+        auto outputs = call.type->Evaluate(args);
+
+        // Store outputs
+        allValues.insert(end(allValues), begin(outputs), end(outputs));
+        for(size_t i=0; i<call.outputSlotIndices.size(); ++i)
+        {
+            slotValues[call.outputSlotIndices[i]] = outputs[i];
+        }
+    } 
+}
+
+///////////////////////
+// Compilation logic //
+///////////////////////
+
+class ProgramCompiler
 {
     struct NodeRecord
     {
-        std::vector<std::shared_ptr<void>> outputValues;
+        std::vector<size_t> inputSlots;
+        std::vector<size_t> outputSlots;
+        bool used;
         int timestamp;
-        NodeRecord() : timestamp() {}
+        NodeRecord() : used(), timestamp() {}
     };
 
+    Program & program;
     const std::vector<Node> & nodes;
     std::vector<NodeRecord> nodeRecords;
     std::vector<std::shared_ptr<void>> allProducedValues;
     int timestamp;
 
+    void CompileConstants(int index);
     void ExecuteNode(int index);
     void LazilyUpdatePureNode(int index);
 public:
-    EventExecutionRecord(const std::vector<Node> & nodes);
-
-    void ExecuteEvent(int nodeIndex);
+    ProgramCompiler::ProgramCompiler(Program & program, const std::vector<Node> & nodes) : program(program), nodes(nodes), timestamp() {}
+    void Compile(int startIndex);
 };
 
-void ExecuteEvent(const std::vector<Node> & nodes, int startIndex)
+Program Compile(const std::vector<Node> & nodes, int startIndex)
 {
-    EventExecutionRecord record(nodes);
-    record.ExecuteEvent(startIndex);    
+    Program program;
+    ProgramCompiler compiler(program, nodes);
+    compiler.Compile(startIndex);
+    return program;
 }
 
-EventExecutionRecord::EventExecutionRecord(const std::vector<Node> & nodes) : nodes(nodes), nodeRecords(nodes.size()), timestamp() 
+void ProgramCompiler::CompileConstants(int index)
 {
+    auto & record = nodeRecords[index];
+    if(record.used) return; // Only need to do this once per node
+    record.used = true;
 
-}
-
-void EventExecutionRecord::ExecuteEvent(int nodeIndex)
-{
-    while(nodeIndex >= 0 && nodeIndex < nodes.size())
+    auto & node = nodes[index];
+    for(size_t i=0; i<node.inputs.size(); ++i)
     {
-        ++timestamp;
-        for(auto & input : nodes[nodeIndex].inputs)
+        auto & input = node.inputs[i];
+        if(input.nodeIndex == -1) // Immediate
         {
-            if(input.nodeIndex >= 0) LazilyUpdatePureNode(input.nodeIndex);
+            if(input.immediate.empty()) throw std::runtime_error("Compile error - Wire not connected and no immediate present!");
+
+            auto type = node.nodeType->GetInputType(i);
+            assert(type.indirection == VarType::None);
+            if(type.type->index == typeid(int))
+            {
+                std::istringstream ss(input.immediate);
+                int value; if(!(ss >> value)) throw std::runtime_error("Compile error - Unable to parse int from "+input.immediate);
+                program.constants.push_back(std::make_shared<int>(value));
+            }
+            else if(type.type->index == typeid(float))
+            {
+                std::istringstream ss(input.immediate);
+                float value; if(!(ss >> value)) throw std::runtime_error("Compile error - Unable to parse float from "+input.immediate);
+                program.constants.push_back(std::make_shared<float>(value));
+            }           
+            else throw std::runtime_error(std::string("Compile error - Immediates are not supported for ")+type.type->index.name());
+
+            record.inputSlots[i] = program.constants.size()-1;
         }
-        ExecuteNode(nodeIndex);
-        nodeIndex = nodes[nodeIndex].flowOutputIndex;
+        else // Wired to other node
+        {
+            CompileConstants(input.nodeIndex);
+        }
     }
 }
 
-void EventExecutionRecord::LazilyUpdatePureNode(int index)    
+void ProgramCompiler::Compile(int nodeIndex)
+{
+    program.calls.clear();
+    program.constants.clear();
+    program.numTemporarySlots = 0;
+
+    // Reserve input and output slot indices for every node
+    nodeRecords.resize(nodes.size());
+    for(size_t i=0; i<nodes.size(); ++i)
+    {
+        nodeRecords[i].used = 0;
+        nodeRecords[i].timestamp = 0;
+        nodeRecords[i].inputSlots.resize(nodes[i].nodeType->GetInputCount());
+        nodeRecords[i].outputSlots.resize(nodes[i].nodeType->GetOutputCount());
+    }
+
+    // Compile all constants and mark used nodes
+    for(int i = nodeIndex; i != -1; i = nodes[i].flowOutputIndex)
+    {
+        CompileConstants(i);
+    }
+    program.numTemporarySlots = program.constants.size();
+
+    // Reserve temporary slots for outputs of all used functions
+    for(size_t i=0; i<nodes.size(); ++i)
+    {
+        if(!nodeRecords[i].used) continue;
+        for(size_t j=0; j<nodes[i].nodeType->GetOutputCount(); ++j)
+        {
+            nodeRecords[i].outputSlots[j] = program.numTemporarySlots + j;
+        }
+        program.numTemporarySlots += nodes[i].nodeType->GetOutputCount();
+    }
+
+    // Determine temporary slot indices to use for function inputs
+    for(size_t i=0; i<nodes.size(); ++i)
+    {
+        if(!nodeRecords[i].used) continue;
+        for(size_t j=0; j<nodes[i].nodeType->GetInputCount(); ++j)
+        {
+            auto & input = nodes[i].inputs[j];
+            if(input.nodeIndex == -1) continue; // Immediates were already set during CompileConstants() phase
+            nodeRecords[i].inputSlots[j] = nodeRecords[input.nodeIndex].outputSlots[input.pinIndex];
+        }
+        program.numTemporarySlots += nodes[i].nodeType->GetOutputCount();
+    }
+
+    // Emit calls for nodes in order
+    for(int i = nodeIndex; i != -1; i = nodes[i].flowOutputIndex)
+    {
+        ++timestamp;
+        for(auto & input : nodes[i].inputs)
+        {
+            if(input.nodeIndex >= 0) LazilyUpdatePureNode(input.nodeIndex);
+        }
+        ExecuteNode(i);
+    }
+}
+
+void ProgramCompiler::LazilyUpdatePureNode(int index)    
 {
     // If this node is sequenced, simply verify that it has been run at least once
     auto & node = nodes[index];
@@ -155,53 +273,19 @@ void EventExecutionRecord::LazilyUpdatePureNode(int index)
     if(needsUpdate) ExecuteNode(index);
 }
 
-void EventExecutionRecord::ExecuteNode(int index)
+void ProgramCompiler::ExecuteNode(int index)
 {
     const auto & node = nodes[index];
     auto & record = nodeRecords[index];
 
-    void * args[8];
-    for(size_t i=0; i<node.inputs.size(); ++i)
-    {
-        auto wire = node.inputs[i];
-        if(wire.nodeIndex < 0)
-        {
-            if(wire.immediate.empty()) return;
+    Program::Call call;
+    call.type = node.nodeType;
+    call.inputSlotIndices = record.inputSlots;
+    call.outputSlotIndices = record.outputSlots;
+    program.calls.push_back(call);
 
-            auto type = node.nodeType->GetInputType(i);
-            assert(type.indirection == VarType::None);
-            if(type.type->index == typeid(int))
-            {
-                std::istringstream ss(wire.immediate);
-                int value; if(!(ss >> value)) return;
-                allProducedValues.push_back(std::make_shared<int>(value));
-            }
-            else if(type.type->index == typeid(float))
-            {
-                std::istringstream ss(wire.immediate);
-                float value; if(!(ss >> value)) return;
-                allProducedValues.push_back(std::make_shared<float>(value));
-            }           
-            else return;
-            args[i] = allProducedValues.back().get();
-        }
-        else
-        {
-            const auto & inputRecord = nodeRecords[wire.nodeIndex];
-            assert(inputRecord.timestamp > 0 && inputRecord.timestamp <= timestamp);
-            args[i] = nodeRecords[wire.nodeIndex].outputValues[wire.pinIndex].get();
-        }
-    }
-
-    // Evalute node
-    record.outputValues = node.nodeType->Evaluate(args);
     record.timestamp = timestamp;
-
-    // Copy produced values into all produced values list, in case results are later overwritten while the produced values are still referenced
-    for(auto value : record.outputValues) allProducedValues.push_back(value);
 }
-
-
 
 //////////////////////////////
 // JSON serialization logic //
