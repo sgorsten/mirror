@@ -1,4 +1,5 @@
 #include "editor.h"
+#include "event.h"
 #include "json.h"
 
 #include <GL/freeglut.h>
@@ -152,8 +153,8 @@ void OnMouse(int button, int state, int x, int y)
 
                     try
                     {
-                        auto prog = Compile(editor.nodes, editor.mouseover.node - editor.nodes.data());
-                        prog.Execute();
+                        Event ev = Compile(editor.nodes, editor.mouseover.node - editor.nodes.data()); 
+                        ev();
                     }
                     catch(const std::exception & e)
                     {

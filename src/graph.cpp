@@ -1,110 +1,6 @@
 #include "graph.h"
-
-#include <sstream>
-
-////////////////////////
-// Node type creation //
-////////////////////////
-
-NodeType NodeType::MakeEventNode(std::string name)
-{
-    NodeType n = {};
-    n.uniqueId = "event:"+name;
-    n.label = "On "+name;
-    n.hasOutFlow = true;
-    n.eval = [](void ** inputs) { return std::vector<std::shared_ptr<void>>{}; };
-    return n;        
-}
-
-NodeType NodeType::MakeFunctionNode(const Function & function)
-{
-    NodeType n = {};
-
-    std::ostringstream ss; ss << "func:" << function;
-    n.uniqueId = ss.str();
-    n.label = function.GetName();
-    for(size_t i=0; i<function.GetParamCount(); ++i) n.inputs.push_back({function.GetParamName(i), function.GetParamType(i)});
-    if(function.GetReturnType().type->index != typeid(void)) n.outputs.push_back({"", function.GetReturnType()});
-    n.hasInFlow = n.hasOutFlow = true;
-    n.eval = [&function](void ** inputs) { return std::vector<std::shared_ptr<void>>{function.Invoke(inputs)}; };
-    return n;
-}
-
-NodeType NodeType::MakeSplitNode(const Type & type)
-{
-    NodeType n = {};
-
-    std::ostringstream ss; ss << "split:" << type;
-    n.uniqueId = ss.str();
-    ss.str(""); ss << "split " << type;
-    n.label = ss.str();
-    n.inputs.push_back({"", {&type, false, false, VarType::LValueRef}});
-    for(auto & f : type.fields) n.outputs.push_back({f.identifier, f.type});
-    n.eval = [&type](void ** inputs) 
-    {
-        std::vector<std::shared_ptr<void>> outputs; 
-        for(auto & field : type.fields) outputs.push_back(std::shared_ptr<void>(field.accessor(inputs[0]), [](void *){}));
-        return outputs; 
-    };
-    return n;
-}
-
-NodeType NodeType::MakeBuildNode(const Type & type)
-{
-    NodeType n = {};
-
-    std::ostringstream ss; ss << "build:" << type;
-    n.uniqueId = ss.str();
-    ss.str(""); ss << "build " << type;
-    n.label = ss.str();
-    for(auto & f : type.fields) n.inputs.push_back({f.identifier, f.type});
-    n.outputs.push_back({"", {&type, false, false, VarType::None}});
-    n.eval = [&type](void ** inputs) -> std::vector<std::shared_ptr<void>>
-    {
-        auto output = type.DefConstruct();
-        for(auto & field : type.fields)
-        {
-            assert(field.type.indirection == VarType::None);
-            field.type.type->CopyAssign(field.accessor(output.get()), *inputs++);
-        }
-        return {output};
-    };
-    return n;
-}
-
-/////////////////////
-// Execution logic //
-/////////////////////
-
-void Program::Execute() const
-{
-    // Reserve enough space
-    auto slotValues = constants;
-    auto allValues = slotValues;
-    slotValues.resize(numTemporarySlots, nullptr);
-    
-    // Execute calls in order
-    for(auto & call : calls)
-    {
-        // Setup arguments list
-        void * args[8];
-        for(size_t i=0; i<call.inputSlotIndices.size(); ++i)
-        {
-            args[i] = slotValues[call.inputSlotIndices[i]].get();
-            assert(args[i] != nullptr);
-        }
-
-        // Evalute node
-        auto outputs = call.type->Evaluate(args);
-
-        // Store outputs
-        allValues.insert(end(allValues), begin(outputs), end(outputs));
-        for(size_t i=0; i<call.outputSlotIndices.size(); ++i)
-        {
-            slotValues[call.outputSlotIndices[i]] = outputs[i];
-        }
-    } 
-}
+#include "event.h"  // For Program
+#include "json.h"   // For JsonValue
 
 ///////////////////////
 // Compilation logic //
@@ -135,10 +31,10 @@ public:
     void Compile(int startIndex);
 };
 
-Program Compile(const std::vector<Node> & nodes, int startIndex)
+std::shared_ptr<const Program> Compile(const std::vector<Node> & nodes, int startIndex)
 {
-    Program program;
-    ProgramCompiler compiler(program, nodes);
+    auto program = std::make_shared<Program>();
+    ProgramCompiler compiler(*program, nodes);
     compiler.Compile(startIndex);
     return program;
 }
@@ -157,7 +53,7 @@ void ProgramCompiler::CompileConstants(int index)
         {
             if(input.immediate.empty()) throw std::runtime_error("Compile error - Wire not connected and no immediate present!");
 
-            auto type = node.nodeType->GetInputType(i);
+            auto type = node.nodeType->inputs[i].type;
             assert(type.indirection == VarType::None);
             if(type.type->index == typeid(int))
             {
@@ -194,8 +90,8 @@ void ProgramCompiler::Compile(int nodeIndex)
     {
         nodeRecords[i].used = 0;
         nodeRecords[i].timestamp = 0;
-        nodeRecords[i].inputSlots.resize(nodes[i].nodeType->GetInputCount());
-        nodeRecords[i].outputSlots.resize(nodes[i].nodeType->GetOutputCount());
+        nodeRecords[i].inputSlots.resize(nodes[i].nodeType->inputs.size());
+        nodeRecords[i].outputSlots.resize(nodes[i].nodeType->outputs.size());
     }
 
     // Compile all constants and mark used nodes
@@ -209,24 +105,23 @@ void ProgramCompiler::Compile(int nodeIndex)
     for(size_t i=0; i<nodes.size(); ++i)
     {
         if(!nodeRecords[i].used) continue;
-        for(size_t j=0; j<nodes[i].nodeType->GetOutputCount(); ++j)
+        for(size_t j=0; j<nodes[i].nodeType->outputs.size(); ++j)
         {
             nodeRecords[i].outputSlots[j] = program.numTemporarySlots + j;
         }
-        program.numTemporarySlots += nodes[i].nodeType->GetOutputCount();
+        program.numTemporarySlots += nodes[i].nodeType->outputs.size();
     }
 
     // Determine temporary slot indices to use for function inputs
     for(size_t i=0; i<nodes.size(); ++i)
     {
         if(!nodeRecords[i].used) continue;
-        for(size_t j=0; j<nodes[i].nodeType->GetInputCount(); ++j)
+        for(size_t j=0; j<nodes[i].nodeType->inputs.size(); ++j)
         {
             auto & input = nodes[i].inputs[j];
             if(input.nodeIndex == -1) continue; // Immediates were already set during CompileConstants() phase
             nodeRecords[i].inputSlots[j] = nodeRecords[input.nodeIndex].outputSlots[input.pinIndex];
         }
-        program.numTemporarySlots += nodes[i].nodeType->GetOutputCount();
     }
 
     // Emit calls for nodes in order
@@ -279,7 +174,7 @@ void ProgramCompiler::ExecuteNode(int index)
     auto & record = nodeRecords[index];
 
     Program::Call call;
-    call.type = node.nodeType;
+    call.nodeType = node.nodeType;
     call.inputSlotIndices = record.inputSlots;
     call.outputSlotIndices = record.outputSlots;
     program.calls.push_back(call);
@@ -290,8 +185,6 @@ void ProgramCompiler::ExecuteNode(int index)
 //////////////////////////////
 // JSON serialization logic //
 //////////////////////////////
-
-#include "json.h"
 
 JsonValue SaveGraph(const std::vector<Node> & nodes)
 {

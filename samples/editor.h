@@ -53,10 +53,10 @@ struct NodeView
     const NodeType &                    GetNodeType() const                                 { return *node.nodeType; }
     const int2 &                        GetPosition() const                                 { return reinterpret_cast<const int2 &>(node.x); }
 
-    int                                 GetInputCount() const                               { return GetNodeType().GetInputCount(); }
-    int                                 GetOutputCount() const                              { return GetNodeType().GetOutputCount(); }
-    VarType                             GetInputType(size_t index) const                    { return GetNodeType().GetInputType(index); }
-    VarType                             GetOutputType(size_t index) const                   { return GetNodeType().GetOutputType(index); }
+    int                                 GetInputCount() const                               { return GetNodeType().inputs.size(); }
+    int                                 GetOutputCount() const                              { return GetNodeType().outputs.size(); }
+    VarType                             GetInputType(size_t index) const                    { return GetNodeType().inputs[index].type; }
+    VarType                             GetOutputType(size_t index) const                   { return GetNodeType().outputs[index].type; }
 
     int                                 GetPinSize() const                                  { return 16; }
     int                                 GetPinPadding() const                               { return 2; }
@@ -64,8 +64,8 @@ struct NodeView
     int                                 GetLineSize() const                                 { return 22; }
     int                                 GetLinePadding() const                              { return 2; }
 
-    std::string                         GetInputLabel(size_t index) const                   { return GetNodeType().GetInputLabel(index); }
-    std::string                         GetOutputLabel(size_t index) const                  { return GetNodeType().GetOutputLabel(index); }
+    std::string                         GetInputLabel(size_t index) const                   { return GetNodeType().inputs[index].label; }
+    std::string                         GetOutputLabel(size_t index) const                  { return GetNodeType().outputs[index].label; }
 
     bool                                HasInFlow() const                                   { return GetNodeType().hasInFlow; }
     bool                                HasOutFlow() const                                  { return GetNodeType().hasOutFlow; }
@@ -105,7 +105,7 @@ struct Feature
 
     bool                                IsFlowPin() const                                   { return type == FlowInput || type == FlowOutput; }
     bool                                IsDataPin() const                                   { return type == Input || type == Output; }
-    VarType                             GetPinType() const                                  { assert(IsDataPin()); return type == Input ? node->nodeType->GetInputType(pin) : node->nodeType->GetOutputType(pin); }
+    VarType                             GetPinType() const                                  { assert(IsDataPin()); return type == Input ? node->nodeType->inputs[pin].type : node->nodeType->outputs[pin].type; }
     Rect                                GetPinRect() const;
 };
 
