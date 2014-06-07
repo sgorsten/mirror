@@ -162,11 +162,11 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\samples\graph.h" />
+    <ClInclude Include="..\samples\editor.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\samples\draw.cpp" />
-    <ClCompile Include="..\samples\graph.cpp" />
+    <ClCompile Include="..\samples\editor.cpp" />
     <ClCompile Include="..\samples\main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

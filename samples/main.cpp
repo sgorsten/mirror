@@ -1,4 +1,4 @@
-#include "graph.h"
+#include "editor.h"
 
 #include <GL/freeglut.h>
 

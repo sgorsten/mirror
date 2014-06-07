@@ -1,4 +1,4 @@
-#include "graph.h"
+#include "editor.h"
 
 void WriteValue(std::ostream & out, const Type & type, void * value)
 {
