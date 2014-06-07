@@ -109,19 +109,85 @@ void GraphEditor::RecomputeNode(Node & n)
     n.outputValues = n.nodeType->Evaluate(args);
 }
 
+static void LazilyUpdatePureNode(GraphEditor & editor, std::vector<int> & lastTimeComputed, int nodeIndex, int curTime)
+{
+    // If this node is sequenced, simply verify that it has been run at least once
+    auto & node = editor.nodes[nodeIndex];
+    if(node.HasInFlow() || node.HasOutFlow())
+    {
+        if(lastTimeComputed[nodeIndex] == 0) throw std::runtime_error("Flow error: Node depends on sequenced node which has not yet been run!");
+        return;
+    }
+
+    // Otherwise node is pure.
+    int lastTime = lastTimeComputed[nodeIndex];
+    if(lastTime == curTime) return; // Node was recomputed this timestep, no need to revisit it
+
+    bool needsUpdate = false;
+    if(lastTime == 0) needsUpdate = true; // If this node was never computed, we need to update it
+
+    // Check all dependencies
+    for(size_t i=0; i<node.inputs.size(); ++i)
+    {
+        const auto & input = node.inputs[i];
+        if(input.nodeIndex >= 0)
+        {
+            // Allow this input to update if it needs to. If this input was recomputed more recently than our node, we also need to recompute
+            LazilyUpdatePureNode(editor, lastTimeComputed, input.nodeIndex, curTime);
+            if(lastTimeComputed[input.nodeIndex] > lastTime) needsUpdate = true;
+        }
+    }
+
+    // If this node needs an update, lets recompute it
+    if(needsUpdate)
+    {
+        editor.RecomputeNode(node);
+        lastTimeComputed[nodeIndex] = curTime;
+    }
+}
+
+void GraphEditor::ExecuteNode(Node & n)
+{
+    std::vector<int> lastTimeComputed(nodes.size(), 0);
+    int curTime = 0;
+
+    Node * nextNode = &n;    
+    while(nextNode)
+    {
+        ++curTime;
+
+        // Update any of our pure functional dependencies
+        for(const auto & input : nextNode->inputs)
+        {
+            if(input.nodeIndex >= 0) LazilyUpdatePureNode(*this, lastTimeComputed, input.nodeIndex, curTime);
+        }
+
+        // Recompute current sequenced node, and record time computed
+        RecomputeNode(*nextNode);
+        lastTimeComputed[nextNode - nodes.data()] = curTime;
+
+        // Determine next node in sequence
+        auto nextIndex = nextNode->flowOutputIndex;
+        nextNode = nextIndex < 0 ? nullptr : &nodes[nextIndex];
+    }
+}
+
 Feature GraphEditor::GetFeature(const int2 & coord)
 {
     for(auto & n : nodes)
     {
         if(n.GetNodeRect().Contains(coord))
         {
-            if(n.IsSequenced())
+            if(n.HasInFlow())
             {
                 if(n.GetFlowInputRect().Contains(coord))
                 {
                     return {coord, Feature::FlowInput, &n, 0};
                 }
+            }
 
+            if(n.HasOutFlow())
+            {
                 if(n.GetFlowOutputRect().Contains(coord))
                 {
                     return {coord, Feature::FlowOutput, &n, 0};

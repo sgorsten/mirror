@@ -4,6 +4,8 @@
 
 GraphEditor editor;
 
+int g_editorGlutWindow, g_sketchpadGlutWindow;
+
 int GetStringWidth12(const std::string & text)
 {
     int w = 0;
@@ -136,9 +138,17 @@ void OnMouse(int button, int state, int x, int y)
                 editor.menuPos = {x,y};
                 editor.mode = GraphEditor::NewNodePopup;
             }
-            else
+            else if(editor.mouseover.type == Feature::Body)
             {
-                editor.RecomputeNode(*editor.mouseover.node);
+                auto type = editor.mouseover.node->nodeType;
+                if(type->hasOutFlow && !type->hasInFlow) // Event!
+                {
+                    glutSetWindow(g_sketchpadGlutWindow);
+                    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                    editor.ExecuteNode(*editor.mouseover.node);
+                    glutSwapBuffers();
+                    glutSetWindow(g_editorGlutWindow);
+                }
             }
         }
         break;
@@ -183,7 +193,7 @@ void OnKeyboard(unsigned char key, int x, int y)
                 }
                 std::cout << "\n    ]";
             }
-            if(n.IsSequenced())
+            if(n.HasOutFlow())
             {
                 std::cout << ",\n    \"next\":";
                 if(n.flowOutputIndex >= 0) std::cout << n.flowOutputIndex;
@@ -202,7 +212,7 @@ void OnDisplay()
     glutSwapBuffers();
 }
 
-int neg(int a) { return -a; }
+/*int neg(int a) { return -a; }
 int add(int a, int b) { return a+b; }
 int mul(int a, int b) { return a*b; }
 float negf(float a) { return -a; }
@@ -221,45 +231,87 @@ struct Character
     void move(float dx, float dy) { x+=dx; y+=dy; }
     void damage(int dmg) { hp -= dmg; }
     void heal(int healing) { hp += healing; }
-};
+};*/
+
+struct Point { float x,y; };
+struct Color { float r,g,b; };
+
+void DrawLine(const Color & color, const Point & p0, const Point & p1)
+{
+    glBegin(GL_LINES);
+    glColor3fv(&color.r);
+    glVertex2fv(&p0.x);
+    glVertex2fv(&p1.x);
+    glEnd();
+
+}
+
+void DrawTriangle(const Color & color, const Point & p0, const Point & p1, const Point & p2)
+{
+    glBegin(GL_TRIANGLES);
+    glColor3fv(&color.r);
+    glVertex2fv(&p0.x);
+    glVertex2fv(&p1.x);
+    glVertex2fv(&p2.x);
+    glEnd();
+}
+
+void DrawCircle(const Color & color, const Point & center, float radius)
+{
+    glBegin(GL_TRIANGLE_FAN);
+    glColor3fv(&color.r);
+    for(int i=0; i<24; ++i)
+    {
+        float a = i*6.28f/24;
+        glVertex2f(center.x + std::cos(a)*radius, center.y + std::sin(a)*radius);
+    }
+    glEnd();
+}
+
+void OnSketchpadDisplay() {}
 
 int main(int argc, char * argv[])
 {
     TypeLibrary types;
-    types.BindFunction(&neg,  "neg", {});
-    types.BindFunction(&add,  "add", {"a","b"});
-    types.BindFunction(&mul,  "mul", {"a","b"});
-    types.BindFunction(&negf, "negf", {});
-    types.BindFunction(&addf, "addf", {"a","b"});
-    types.BindFunction(&mulf, "mulf", {"a","b"});
-    types.BindClass<Character>("Character")
-        .HasField(&Character::x,  "x")
-        .HasField(&Character::y,  "y")
-        .HasField(&Character::hp, "hp")
-        .HasMethod(&Character::move,   "move",   {"dx","dy"})
-        .HasMethod(&Character::damage, "damage", {"dmg"})
-        .HasMethod(&Character::heal,   "heal",   {"hp"})
-        .HasConstructor<int>({"hp"});
+    types.BindFunction(&DrawLine, "DrawLine", {"color","p0","p1"});
+    types.BindFunction(&DrawTriangle, "DrawTriangle", {"color","p0","p1","p2"});
+    types.BindFunction(&DrawCircle, "DrawCircle", {"color","center","radius"});
+    types.BindClass<Point>("Point")
+        .HasField(&Point::x, "x")
+        .HasField(&Point::y, "y");
+    types.BindClass<Color>("Color")
+        .HasField(&Color::r, "r")
+        .HasField(&Color::g, "g")
+        .HasField(&Color::b, "b");
 
+    editor.nodeTypes.push_back(NodeType::MakeEventNode("Start"));
     for(auto & func : types.GetAllFunctions())
     {
         editor.nodeTypes.push_back(NodeType::MakeFunctionNode(func));
     }
-    editor.nodeTypes.push_back(NodeType::MakeBuildNode(types.DeduceType<Character>()));
-    editor.nodeTypes.push_back(NodeType::MakeSplitNode(types.DeduceType<Character>()));
+    editor.nodeTypes.push_back(NodeType::MakeBuildNode(types.DeduceType<Point>()));
+    editor.nodeTypes.push_back(NodeType::MakeSplitNode(types.DeduceType<Point>()));
+    editor.nodeTypes.push_back(NodeType::MakeBuildNode(types.DeduceType<Color>()));
+    editor.nodeTypes.push_back(NodeType::MakeSplitNode(types.DeduceType<Color>()));
 
     glutInit(&argc, argv);
-    glutInitWindowSize(1280, 720);
     glutInitDisplayMode(GLUT_RGBA|GLUT_DOUBLE|GLUT_DEPTH);
-    glutCreateWindow("libmirror call graph visualizer");
 
+    glutInitWindowSize(1280, 720);
+    glutInitWindowPosition(80, 80);
+    g_editorGlutWindow = glutCreateWindow("libmirror call graph visualizer");
     glutIdleFunc(OnIdle);
     glutDisplayFunc(OnDisplay);
-    //glutReshapeFunc(OnReshape);
     glutPassiveMotionFunc(OnMotion);
     glutMotionFunc(OnMotion);
     glutMouseFunc(OnMouse);
     glutKeyboardFunc(OnKeyboard);
+
+    glutInitWindowSize(400, 400);
+    glutInitWindowPosition(1440, 80);
+    g_sketchpadGlutWindow = glutCreateWindow("sketchpad");
+    glutDisplayFunc(OnSketchpadDisplay);
+
     glutMainLoop();
 
     return 0;

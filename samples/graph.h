@@ -53,7 +53,8 @@ struct NodeType
     struct Pin { std::string label; VarType type; };
     std::string uniqueId, label;
     std::vector<Pin> inputs, outputs;
-    bool isSequenced;
+    bool hasInFlow;
+    bool hasOutFlow;
     std::function<std::vector<std::shared_ptr<void>>(void **)> eval;
 
     const std::string & GetUniqueId() const { return uniqueId; }
@@ -66,6 +67,16 @@ struct NodeType
     std::string GetOutputLabel(size_t index) const { return outputs[index].label; }
     std::vector<std::shared_ptr<void>> Evaluate(void * inputs[]) const { return eval(inputs); }
 
+    static NodeType MakeEventNode(std::string name)
+    {
+        NodeType n = {};
+        n.uniqueId = "event:"+name;
+        n.label = "On "+name;
+        n.hasOutFlow = true;
+        n.eval = [](void ** inputs) { return std::vector<std::shared_ptr<void>>{}; };
+        return n;        
+    }
+
     static NodeType MakeFunctionNode(const Function & function)
     {
         NodeType n = {};
@@ -73,7 +84,7 @@ struct NodeType
         n.label = function.GetName();
         for(size_t i=0; i<function.GetParamCount(); ++i) n.inputs.push_back({function.GetParamName(i), function.GetParamType(i)});
         if(function.GetReturnType().type->index != typeid(void)) n.outputs.push_back({"", function.GetReturnType()});
-        n.isSequenced = true;
+        n.hasInFlow = n.hasOutFlow = true;
         n.eval = [&function](void ** inputs) { return std::vector<std::shared_ptr<void>>{function.Invoke(inputs)}; };
         return n;
     }
@@ -144,8 +155,9 @@ struct Node
     std::string                         GetInputLabel(size_t index) const                   { return nodeType->GetInputLabel(index); }
     std::string                         GetOutputLabel(size_t index) const                  { return nodeType->GetOutputLabel(index); }
 
-    bool                                IsSequenced() const                                 { return nodeType->isSequenced; }
-    int                                 GetFlowControlSize() const                          { return IsSequenced() ? GetPinSpacing() : 0; }
+    bool                                HasInFlow() const                                   { return nodeType->hasInFlow; }
+    bool                                HasOutFlow() const                                  { return nodeType->hasOutFlow; }
+    int                                 GetFlowControlSize() const                          { return HasInFlow() || HasOutFlow() ? GetPinSpacing() : 0; }
     Rect                                GetFlowInputRect() const                            { return GetPinRect(position.x,position.y); }
     Rect                                GetFlowOutputRect() const                           { return GetPinRect(position.x+GetSizeX()-GetPinSize(),position.y); }
 
@@ -205,6 +217,9 @@ struct GraphEditor
     void ConnectPins(Feature a, Feature b);
 
     void RecomputeNode(Node & n);
+
+    void ExecuteNode(Node & n);
+
     Feature GetFeature(const int2 & coord);
 
     void DeleteNode(int index);

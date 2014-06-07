@@ -91,7 +91,7 @@ void GraphEditor::Draw() const
     glColor3f(1,1,1);
     for(const auto & n : nodes)
     {
-        if(n.IsSequenced() && n.flowOutputIndex >= 0)
+        if(n.HasOutFlow() && n.flowOutputIndex >= 0)
         {
             r.DrawLine(n.GetFlowOutputRect().GetCenter(), nodes[n.flowOutputIndex].GetFlowInputRect().GetCenter());
         }
@@ -123,7 +123,7 @@ void GraphEditor::Draw() const
             rect.b0.y += n.GetLineSpacing();
         }
 
-        if(n.IsSequenced())
+        if(n.HasInFlow())
         {
             rect = n.GetFlowInputRect();
             auto center = rect.GetCenter();
@@ -135,10 +135,13 @@ void GraphEditor::Draw() const
             glVertex2i(rect.b1.x, center.y);
             glVertex2i(center.x, rect.b1.y);
             glVertex2i(rect.b0.x, rect.b1.y);
-            glEnd();            
+            glEnd();
+        }          
 
+        if(n.HasOutFlow())
+        {
             rect = n.GetFlowOutputRect();
-            center = rect.GetCenter();
+            auto center = rect.GetCenter();
             glBegin(GL_TRIANGLE_FAN);
             if(clicked.type == Feature::FlowInput) glColor3f(1,1,0);
             else glColor3f(0.5f,0.5f,0.5f);
