@@ -3,6 +3,17 @@
 
 #include "graph.h"
 
+#include <algorithm>
+#include <sstream>
+
+class ToString
+{
+    std::ostringstream ss;
+public:
+    operator std::string() const { return ss.str(); }
+    template<class T> ToString & operator << (const T & val) { ss << val; return *this; }
+};
+
 template<class T> struct vec2
 { 
     T       x,y; 

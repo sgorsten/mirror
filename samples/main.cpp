@@ -69,7 +69,7 @@ void OnMouse(int button, int state, int x, int y)
                     int index = (y - editor.menuPos.y) / 16;
                     if(index >= 0 && index < editor.nodeTypes.size())
                     {
-                        editor.nodes.push_back(Node(editor.menuPos.x, editor.menuPos.y, editor.nodeTypes[index]));
+                        editor.nodes.push_back(Node(editor.nodeTypes[index], editor.menuPos.x, editor.menuPos.y));
                     }
                     editor.mode = GraphEditor::None;
                 }

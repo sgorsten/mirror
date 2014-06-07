@@ -3,20 +3,7 @@
 #ifndef MIRROR_GRAPH_H
 #define MIRROR_GRAPH_H
 
-
 #include "refl.h"
-#include "json.h"
-
-#include <sstream>
-#include <algorithm>
-
-class ToString
-{
-    std::ostringstream ss;
-public:
-    operator std::string() const { return ss.str(); }
-    template<class T> ToString & operator << (const T & val) { ss << val; return *this; }
-};
 
 struct NodeType
 {
@@ -37,63 +24,10 @@ struct NodeType
     std::string GetOutputLabel(size_t index) const { return outputs[index].label; }
     std::vector<std::shared_ptr<void>> Evaluate(void * inputs[]) const { return eval(inputs); }
 
-    static NodeType MakeEventNode(std::string name)
-    {
-        NodeType n = {};
-        n.uniqueId = "event:"+name;
-        n.label = "On "+name;
-        n.hasOutFlow = true;
-        n.eval = [](void ** inputs) { return std::vector<std::shared_ptr<void>>{}; };
-        return n;        
-    }
-
-    static NodeType MakeFunctionNode(const Function & function)
-    {
-        NodeType n = {};
-        n.uniqueId = ToString() << "func:" << function;
-        n.label = function.GetName();
-        for(size_t i=0; i<function.GetParamCount(); ++i) n.inputs.push_back({function.GetParamName(i), function.GetParamType(i)});
-        if(function.GetReturnType().type->index != typeid(void)) n.outputs.push_back({"", function.GetReturnType()});
-        n.hasInFlow = n.hasOutFlow = true;
-        n.eval = [&function](void ** inputs) { return std::vector<std::shared_ptr<void>>{function.Invoke(inputs)}; };
-        return n;
-    }
-
-    static NodeType MakeSplitNode(const Type & type)
-    {
-        NodeType n = {};
-        n.uniqueId = ToString() << "split:" << type;
-        n.label = ToString() << "split " << type;
-        n.inputs.push_back({"", {&type, false, false, VarType::LValueRef}});
-        for(auto & f : type.fields) n.outputs.push_back({f.identifier, f.type});
-        n.eval = [&type](void ** inputs) 
-        {
-            std::vector<std::shared_ptr<void>> outputs; 
-            for(auto & field : type.fields) outputs.push_back(std::shared_ptr<void>(field.accessor(inputs[0]), [](void *){}));
-            return outputs; 
-        };
-        return n;
-    }
-
-    static NodeType MakeBuildNode(const Type & type)
-    {
-        NodeType n = {};
-        n.uniqueId = ToString() << "build:" << type;
-        n.label = ToString() << "build " << type;
-        for(auto & f : type.fields) n.inputs.push_back({f.identifier, f.type});
-        n.outputs.push_back({"", {&type, false, false, VarType::None}});
-        n.eval = [&type](void ** inputs) -> std::vector<std::shared_ptr<void>>
-        {
-            auto output = type.DefConstruct();
-            for(auto & field : type.fields)
-            {
-                assert(field.type.indirection == VarType::None);
-                field.type.type->CopyAssign(field.accessor(output.get()), *inputs++);
-            }
-            return {output};
-        };
-        return n;
-    }
+    static NodeType MakeEventNode(std::string name);
+    static NodeType MakeFunctionNode(const Function & function);
+    static NodeType MakeSplitNode(const Type & type);
+    static NodeType MakeBuildNode(const Type & type);
 };
 
 struct Node
@@ -104,15 +38,15 @@ struct Node
         std::string     immediate;
     };
 
-    int                 x,y;
-    const NodeType *    nodeType;
-    std::vector<Wire>   inputs;
-    int                 flowOutputIndex;
+    const NodeType *    nodeType;                                   // The type of this node
+    std::vector<Wire>   inputs;                                     // Wires which carry data from other nodes' outputs to this node's inputs
+    int                 flowOutputIndex;                            // Flow control wire which passes execution from this node to another node after it is run
 
-    bool                selected;
+    int                 x,y;                                        // A set of coordinates, provided for visualization/editing convenience. Has no effect on execution, but will be serialized to/from JSON.
+    bool                selected;                                   // A selection flag, provided for visualization/editing convenience. Has no effect on execution, and will not be serialized to/from JSON.
 
-                        Node()                                      : x(), y(), nodeType(), flowOutputIndex(-1), selected() {}
-                        Node(int x, int y, const NodeType & type)   : x(x), y(y), nodeType(&type), inputs(type.GetInputCount(),{-1,-1}), flowOutputIndex(-1), selected() {}
+                        Node()                                      : nodeType(), flowOutputIndex(-1), x(), y(), selected() {}
+                        Node(const NodeType & type, int x, int y)   : nodeType(&type), inputs(type.GetInputCount(),{-1,-1}), flowOutputIndex(-1), x(x), y(y), selected() {}
 };
 
 void ExecuteEvent(const std::vector<Node> & nodes, int startIndex);
