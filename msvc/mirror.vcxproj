@@ -19,9 +19,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\src\json.cpp" />
     <ClCompile Include="..\src\refl.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\include\json.h" />
     <ClInclude Include="..\include\refl.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
