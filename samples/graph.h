@@ -135,11 +135,10 @@ struct Node
     std::vector<Wire>                   inputs;
     int                                 flowOutputIndex;
 
-    std::vector<std::shared_ptr<void>>  outputValues;
     bool                                selected;
 
                                         Node()                                              : selected(), flowOutputIndex(-1) {}
-                                        Node(const int2 & position, const NodeType * type)  : position(position), nodeType(type), inputs(GetInputCount(),{-1,-1}), flowOutputIndex(-1), outputValues(GetOutputCount()), selected() {}
+                                        Node(const int2 & position, const NodeType * type)  : position(position), nodeType(type), inputs(GetInputCount(),{-1,-1}), flowOutputIndex(-1), selected() {}
 
     int                                 GetInputCount() const                               { return nodeType->GetInputCount(); }
     int                                 GetOutputCount() const                              { return nodeType->GetOutputCount(); }
@@ -200,9 +199,7 @@ struct Feature
 struct GraphEditor
 {
     std::vector<NodeType> nodeTypes;
-    std::vector<Node> nodes;
-
-    
+    std::vector<Node> nodes;  
 
     enum Mode { None, Dragging, NewNodePopup };
     Mode mode;              // What mode the editor is in
@@ -226,6 +223,28 @@ struct GraphEditor
     void DeleteSelection();
 
     void Draw() const;
+};
+
+class EventExecutionRecord
+{
+    struct NodeRecord
+    {
+        std::vector<std::shared_ptr<void>> outputValues;
+        int timestamp;
+        NodeRecord() : timestamp() {}
+    };
+
+    const std::vector<Node> & nodes;
+    std::vector<NodeRecord> nodeRecords;
+    std::vector<std::shared_ptr<void>> allProducedValues;
+    int timestamp;
+
+    void ExecuteNode(int index);
+    void LazilyUpdatePureNode(int index);
+public:
+    EventExecutionRecord(const std::vector<Node> & nodes);
+
+    void ExecuteEvent(int nodeIndex);
 };
 
 #endif

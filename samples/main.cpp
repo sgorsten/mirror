@@ -145,7 +145,10 @@ void OnMouse(int button, int state, int x, int y)
                 {
                     glutSetWindow(g_sketchpadGlutWindow);
                     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-                    editor.ExecuteNode(*editor.mouseover.node);
+
+                    EventExecutionRecord record(editor.nodes);
+                    record.ExecuteEvent(editor.mouseover.node - editor.nodes.data());
+
                     glutSwapBuffers();
                     glutSetWindow(g_editorGlutWindow);
                 }
@@ -212,27 +215,6 @@ void OnDisplay()
     glutSwapBuffers();
 }
 
-/*int neg(int a) { return -a; }
-int add(int a, int b) { return a+b; }
-int mul(int a, int b) { return a*b; }
-float negf(float a) { return -a; }
-float addf(float a, float b) { return a+b; }
-float mulf(float a, float b) { return a*b; }
-
-struct Character
-{
-    float x;
-    float y;
-    int hp;
-
-    Character() : x(), y(), hp(100) {}
-    Character(int hp) : x(), y(), hp(hp) {}
-
-    void move(float dx, float dy) { x+=dx; y+=dy; }
-    void damage(int dmg) { hp -= dmg; }
-    void heal(int healing) { hp += healing; }
-};*/
-
 struct Point { float x,y; };
 struct Color { float r,g,b; };
 
@@ -243,7 +225,6 @@ void DrawLine(const Color & color, const Point & p0, const Point & p1)
     glVertex2fv(&p0.x);
     glVertex2fv(&p1.x);
     glEnd();
-
 }
 
 void DrawTriangle(const Color & color, const Point & p0, const Point & p1, const Point & p2)

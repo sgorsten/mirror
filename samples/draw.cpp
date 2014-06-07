@@ -162,14 +162,7 @@ void GraphEditor::Draw() const
 
             glColor3f(1,1,1);
             r.DrawText12({rect.b1.x + n.GetPinPadding(), rect.b0.y}, n.GetInputLabel(i));
-            if(n.inputs[i].nodeIndex >= 0)
-            {
-                auto & n2 = nodes[n.inputs[i].nodeIndex];
-                auto pin = n.inputs[i].pinIndex;
-                std::string val = ToStr(*n2.GetOutputType(pin).type, n2.outputValues[pin].get());
-                r.DrawText12(rect.b0 - int2(n.GetPinPadding() + GetStringWidth12(val), 0), val);
-            }
-            else if(!n.inputs[i].immediate.empty())
+            if(n.inputs[i].nodeIndex < 0 && !n.inputs[i].immediate.empty())
             {
                 std::string val = n.inputs[i].immediate;
                 glColor3f(0,1,1);
@@ -187,7 +180,6 @@ void GraphEditor::Draw() const
             glColor3f(1,1,1);
             auto lbl = n.GetOutputLabel(i);
             r.DrawText12(rect.b0 - int2(n.GetPinPadding() + GetStringWidth12(lbl), 0), lbl);
-            r.DrawText12({rect.b1.x + n.GetPinPadding(), rect.b0.y}, ToStr(*n.GetOutputType(i).type, n.outputValues[i].get()));
         }
     }
 

@@ -72,106 +72,6 @@ void GraphEditor::ConnectPins(Feature a, Feature b)
     }
 }
 
-void GraphEditor::RecomputeNode(Node & n)
-{  
-    std::vector<std::shared_ptr<void>> immediates;
-    void * args[8];
-    for(size_t i=0; i<n.inputs.size(); ++i)
-    {
-        auto wire = n.inputs[i];
-        if(wire.nodeIndex < 0)
-        {
-            if(wire.immediate.empty()) return;
-
-            auto type = n.GetInputType(i);
-            assert(type.indirection == VarType::None);
-            if(type.type->index == typeid(int))
-            {
-                std::istringstream ss(wire.immediate);
-                int value; if(!(ss >> value)) return;
-                immediates.push_back(std::make_shared<int>(value));
-            }
-            else if(type.type->index == typeid(float))
-            {
-                std::istringstream ss(wire.immediate);
-                float value; if(!(ss >> value)) return;
-                immediates.push_back(std::make_shared<float>(value));
-            }           
-            else return;
-            args[i] = immediates.back().get();
-        }
-        else
-        {
-            if(!nodes[wire.nodeIndex].outputValues[wire.pinIndex]) return;
-            args[i] = nodes[wire.nodeIndex].outputValues[wire.pinIndex].get();
-        }
-    }
-    n.outputValues = n.nodeType->Evaluate(args);
-}
-
-static void LazilyUpdatePureNode(GraphEditor & editor, std::vector<int> & lastTimeComputed, int nodeIndex, int curTime)
-{
-    // If this node is sequenced, simply verify that it has been run at least once
-    auto & node = editor.nodes[nodeIndex];
-    if(node.HasInFlow() || node.HasOutFlow())
-    {
-        if(lastTimeComputed[nodeIndex] == 0) throw std::runtime_error("Flow error: Node depends on sequenced node which has not yet been run!");
-        return;
-    }
-
-    // Otherwise node is pure.
-    int lastTime = lastTimeComputed[nodeIndex];
-    if(lastTime == curTime) return; // Node was recomputed this timestep, no need to revisit it
-
-    bool needsUpdate = false;
-    if(lastTime == 0) needsUpdate = true; // If this node was never computed, we need to update it
-
-    // Check all dependencies
-    for(size_t i=0; i<node.inputs.size(); ++i)
-    {
-        const auto & input = node.inputs[i];
-        if(input.nodeIndex >= 0)
-        {
-            // Allow this input to update if it needs to. If this input was recomputed more recently than our node, we also need to recompute
-            LazilyUpdatePureNode(editor, lastTimeComputed, input.nodeIndex, curTime);
-            if(lastTimeComputed[input.nodeIndex] > lastTime) needsUpdate = true;
-        }
-    }
-
-    // If this node needs an update, lets recompute it
-    if(needsUpdate)
-    {
-        editor.RecomputeNode(node);
-        lastTimeComputed[nodeIndex] = curTime;
-    }
-}
-
-void GraphEditor::ExecuteNode(Node & n)
-{
-    std::vector<int> lastTimeComputed(nodes.size(), 0);
-    int curTime = 0;
-
-    Node * nextNode = &n;    
-    while(nextNode)
-    {
-        ++curTime;
-
-        // Update any of our pure functional dependencies
-        for(const auto & input : nextNode->inputs)
-        {
-            if(input.nodeIndex >= 0) LazilyUpdatePureNode(*this, lastTimeComputed, input.nodeIndex, curTime);
-        }
-
-        // Recompute current sequenced node, and record time computed
-        RecomputeNode(*nextNode);
-        lastTimeComputed[nextNode - nodes.data()] = curTime;
-
-        // Determine next node in sequence
-        auto nextIndex = nextNode->flowOutputIndex;
-        nextNode = nextIndex < 0 ? nullptr : &nodes[nextIndex];
-    }
-}
-
 Feature GraphEditor::GetFeature(const int2 & coord)
 {
     for(auto & n : nodes)
@@ -241,4 +141,103 @@ void GraphEditor::DeleteSelection()
     {
         if(nodes[i].selected) DeleteNode(i);
     }
+}
+
+
+
+EventExecutionRecord::EventExecutionRecord(const std::vector<Node> & nodes) : nodes(nodes), nodeRecords(nodes.size()), timestamp() 
+{
+
+}
+
+void EventExecutionRecord::ExecuteEvent(int nodeIndex)
+{
+    while(nodeIndex >= 0 && nodeIndex < nodes.size())
+    {
+        ++timestamp;
+        for(auto & input : nodes[nodeIndex].inputs)
+        {
+            if(input.nodeIndex >= 0) LazilyUpdatePureNode(input.nodeIndex);
+        }
+        ExecuteNode(nodeIndex);
+        nodeIndex = nodes[nodeIndex].flowOutputIndex;
+    }
+}
+
+void EventExecutionRecord::LazilyUpdatePureNode(int index)    
+{
+    // If this node is sequenced, simply verify that it has been run at least once
+    auto & node = nodes[index];
+    if(node.HasInFlow() || node.HasOutFlow())
+    {
+        if(nodeRecords[index].timestamp == 0) throw std::runtime_error("Sequencing error! Node depends on sequenced node which has not yet been run!");
+        return;
+    }
+
+    // Otherwise node is pure.
+    if(nodeRecords[index].timestamp == timestamp) return; // Node was recomputed this timestep, no need to revisit it
+
+    bool needsUpdate = false;
+    if(nodeRecords[index].timestamp == 0) needsUpdate = true; // If this node was never computed, we need to update it
+
+    // Check all dependencies
+    for(size_t i=0; i<node.inputs.size(); ++i)
+    {
+        const auto & input = node.inputs[i];
+        if(input.nodeIndex >= 0)
+        {
+            // Allow this input to update if it needs to. If this input was recomputed more recently than our node, we also need to recompute
+            LazilyUpdatePureNode(input.nodeIndex);
+            if(nodeRecords[input.nodeIndex].timestamp > nodeRecords[index].timestamp) needsUpdate = true;
+        }
+    }
+
+    // If this node needs an update, lets recompute it
+    if(needsUpdate) ExecuteNode(index);
+}
+
+void EventExecutionRecord::ExecuteNode(int index)
+{
+    const auto & node = nodes[index];
+    auto & record = nodeRecords[index];
+
+    void * args[8];
+    for(size_t i=0; i<node.inputs.size(); ++i)
+    {
+        auto wire = node.inputs[i];
+        if(wire.nodeIndex < 0)
+        {
+            if(wire.immediate.empty()) return;
+
+            auto type = node.GetInputType(i);
+            assert(type.indirection == VarType::None);
+            if(type.type->index == typeid(int))
+            {
+                std::istringstream ss(wire.immediate);
+                int value; if(!(ss >> value)) return;
+                allProducedValues.push_back(std::make_shared<int>(value));
+            }
+            else if(type.type->index == typeid(float))
+            {
+                std::istringstream ss(wire.immediate);
+                float value; if(!(ss >> value)) return;
+                allProducedValues.push_back(std::make_shared<float>(value));
+            }           
+            else return;
+            args[i] = allProducedValues.back().get();
+        }
+        else
+        {
+            const auto & inputRecord = nodeRecords[wire.nodeIndex];
+            assert(inputRecord.timestamp > 0 && inputRecord.timestamp <= timestamp);
+            args[i] = nodeRecords[wire.nodeIndex].outputValues[wire.pinIndex].get();
+        }
+    }
+
+    // Evalute node
+    record.outputValues = node.nodeType->Evaluate(args);
+    record.timestamp = timestamp;
+
+    // Copy produced values into all produced values list, in case results are later overwritten while the produced values are still referenced
+    for(auto value : record.outputValues) allProducedValues.push_back(value);
 }
