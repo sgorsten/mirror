@@ -99,10 +99,12 @@ class Function
     std::vector<std::string>            paramNames;
     const Type *                        type;
     FunctionImpl                        impl;
+    bool                                isPure;
 public:
-                                        Function(std::string name, const Type & type, FunctionImpl impl)    : name(move(name)), paramNames(type.paramTypes.size()), type(&type), impl(move(impl)) { assert(type.kind == Type::Function); }
+                                        Function(std::string name, const Type & type, FunctionImpl impl)    : name(move(name)), paramNames(type.paramTypes.size()), type(&type), impl(move(impl)), isPure() { assert(type.kind == Type::Function); }
 
     void                                SetParamName(size_t index, const char * name)                       { paramNames[index] = name; }
+    void                                SetPure()                                                           { isPure = true; }
 
     const std::string &                 GetName() const                                                     { return name; }
     const Type &                        GetType() const                                                     { return *type; }
@@ -111,6 +113,7 @@ public:
     VarType                             GetParamType(size_t index) const                                    { return type->paramTypes[index]; }
     const std::string &                 GetParamName(size_t index) const                                    { return paramNames[index]; }
     const std::vector<VarType> &        GetParamTypes() const                                               { return type->paramTypes; }
+    bool                                IsPure() const                                                      { return isPure; }
     std::shared_ptr<void>               Invoke(void * args[]) const                                         { return impl(args); }
 };
 
@@ -135,6 +138,7 @@ public:
     const Function *                    GetFunction(const char * name) const                { for(auto & f : functions) if(f.GetName() == name) return &f; return nullptr; }
     const Type *                        GetType(std::type_index index) const                { auto it = types.find(index); return it != end(types) ? &it->second : nullptr; }
 
+    template<class R, class... P> void  BindPureFunction(R (*func)(P...), std::string name, std::initializer_list<const char *> paramNames) { BindFunction(func, move(name), paramNames); functions.back().SetPure(); }
     template<class R, class... P> void  BindFunction(R (*func)(P...), std::string name, std::initializer_list<const char *> paramNames) { functions.push_back(BindWithSignature(move(name), func, Tag<R(P...)>())); int i=0; for(auto pn : paramNames) { functions.back().SetParamName(i++, pn); } }
     template<class C> ClassReflector<C> BindClass(std::string name)                         { DeduceType<C>(); auto & type = types[typeid(C)]; type.className = move(name); return ClassReflector<C>(*this, type); }
     template<class T> const Type &      DeduceType()                                        { auto & type = types[typeid(T)]; if(type.kind == Type::None) { type.index = typeid(T); type.size = SizeOf<T>::VALUE; if(!std::is_trivial<T>::value) type.nonTrivialOps = std::make_unique<NontrivialOps>(Tag<T>()); InitType(type, Tag<T>()); assert(type.kind != Type::None); } return type; }

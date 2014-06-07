@@ -44,7 +44,7 @@ NodeType NodeType::MakeFunctionNode(const Function & function)
     impl->label = function.GetName();
     for(size_t i=0; i<function.GetParamCount(); ++i) impl->inputs.push_back({function.GetParamName(i), function.GetParamType(i)});
     if(function.GetReturnType().type->index != typeid(void)) impl->outputs.push_back({"", function.GetReturnType()});
-    impl->hasInFlow = impl->hasOutFlow = true;
+    if(!function.IsPure()) impl->hasInFlow = impl->hasOutFlow = true;
     impl->eval = [&function](void ** inputs) { return std::vector<std::shared_ptr<void>>{function.Invoke(inputs)}; };
 
     NodeType n;

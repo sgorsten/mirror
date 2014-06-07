@@ -227,11 +227,23 @@ void DrawCircle(const Color & color, const Point & center, float radius)
     glEnd();
 }
 
+namespace ops
+{
+    float add(float a, float b) { return a+b; }
+    float sub(float a, float b) { return a-b; }
+    float mul(float a, float b) { return a*b; }
+    float div(float a, float b) { return a/b; }
+}
+
 void OnSketchpadDisplay() {}
 
 int main(int argc, char * argv[])
 {
     TypeLibrary types;
+    types.BindPureFunction(&ops::add, "+", {"",""});
+    types.BindPureFunction(&ops::sub, "-", {"",""});
+    types.BindPureFunction(&ops::mul, "*", {"",""});
+    types.BindPureFunction(&ops::div, "/", {"",""});
     types.BindFunction(&DrawLine, "DrawLine", {"color","p0","p1"});
     types.BindFunction(&DrawTriangle, "DrawTriangle", {"color","p0","p1","p2"});
     types.BindFunction(&DrawCircle, "DrawCircle", {"color","center","radius"});
