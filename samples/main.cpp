@@ -147,10 +147,7 @@ void OnMouse(int button, int state, int x, int y)
                 {
                     glutSetWindow(g_sketchpadGlutWindow);
                     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-                    EventExecutionRecord record(editor.nodes);
-                    record.ExecuteEvent(editor.mouseover.node - editor.nodes.data());
-
+                    ExecuteEvent(editor.nodes, editor.mouseover.node - editor.nodes.data());
                     glutSwapBuffers();
                     glutSetWindow(g_editorGlutWindow);
                 }

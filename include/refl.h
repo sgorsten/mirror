@@ -1,5 +1,7 @@
-#ifndef REFL_H
-#define REFL_H
+// mirror/refl.h
+// Provides core support for reflecting C++ types and functions, and traversing/invoking them at runtime
+#ifndef MIRROR_REFL_H
+#define MIRROR_REFL_H
 
 #include <cassert>
 #include <vector>
