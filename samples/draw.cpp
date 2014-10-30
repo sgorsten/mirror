@@ -64,12 +64,15 @@ void GraphEditor::Draw() const
 {
     Renderer r;
 
+    const int width = glutGet(GLUT_WINDOW_WIDTH), height = glutGet(GLUT_WINDOW_HEIGHT);
+    glViewport(0, 0, width, height);
+
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glPushAttrib(GL_ALL_ATTRIB_BITS);
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
-    glOrtho(0, 1280, 720, 0, -1, 1);
+    glOrtho(0, width, height, 0, -1, 1);
 
     // Draw outlines for selected nodes
     glColor3f(0.5f,0.5f,0);

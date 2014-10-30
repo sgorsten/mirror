@@ -29,6 +29,7 @@ NodeType NodeType::MakeEventNode(std::string name, std::vector<VarType> params)
     impl->uniqueId = "event:"+name;
     impl->label = "On "+name;
     for(auto & param : params) impl->outputs.push_back({"", param});
+    impl->hasInFlow = false;
     impl->hasOutFlow = true;
     size_t count = params.size();   
     impl->eval = [count](void ** inputs) -> std::vector<std::shared_ptr<void>>
@@ -68,6 +69,7 @@ NodeType NodeType::MakeSplitNode(const Type & type)
     impl->label = ss.str();
     impl->inputs.push_back({"", {&type, false, false, VarType::LValueRef}});
     for(auto & f : type.fields) impl->outputs.push_back({f.identifier, f.type});
+    impl->hasInFlow = impl->hasOutFlow = false;
     impl->eval = [&type](void ** inputs) 
     {
         std::vector<std::shared_ptr<void>> outputs; 
@@ -89,6 +91,7 @@ NodeType NodeType::MakeBuildNode(const Type & type)
     impl->label = ss.str();
     for(auto & f : type.fields) impl->inputs.push_back({f.identifier, f.type});
     impl->outputs.push_back({"", {&type, false, false, VarType::None}});
+    impl->hasInFlow = impl->hasOutFlow = false;
     impl->eval = [&type](void ** inputs) -> std::vector<std::shared_ptr<void>>
     {
         auto output = type.DefConstruct();
